@@ -1,16 +1,31 @@
-[workspace]
-members = ["oxker-core", "oxker-tui"]
-resolver = "2"
-
-[workspace.package]
+[package]
+name = "oxker"
 version = "0.11.1"
 edition = "2024"
 authors = ["Jack Wills <email@mrjackwills.com>"]
+description = "A simple tui to view & control docker containers"
 repository = "https://github.com/mrjackwills/oxker"
 homepage = "https://github.com/mrjackwills/oxker"
 license = "MIT"
+readme = "README.md"
+keywords = ["docker", "tui", "tokio", "terminal", "podman"]
+categories = ["command-line-utilities"]
 
-[workspace.dependencies]
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+nursery = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+expect_used = "warn"
+todo = "warn"
+unused_async = "warn"
+unwrap_used = "warn"
+module_name_repetitions = "allow"
+doc_markdown = "allow"
+similar_names = "allow"
+
+[dependencies]
 anyhow = "1.0"
 bollard = "0.19"
 cansi = "2.2"
@@ -31,23 +46,12 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 uuid = { version = "1.18", features = ["fast-rng", "v4"] }
 
-[workspace.lints.rust]
-unsafe_code = "forbid"
-
-[workspace.lints.clippy]
-nursery = { level = "warn", priority = -1 }
-pedantic = { level = "warn", priority = -1 }
-expect_used = "warn"
-todo = "warn"
-unused_async = "warn"
-unwrap_used = "warn"
-module_name_repetitions = "allow"
-doc_markdown = "allow"
-similar_names = "allow"
-
 [profile.release]
 lto = true
 codegen-units = 1
 panic = 'abort'
 strip = true
 debug = false
+
+[dev-dependencies]
+insta = "1.42.2"

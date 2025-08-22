@@ -1,0 +1,34 @@
+[package]
+name = "oxker-tui"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme = "../README.md"
+description = "A simple tui to view & control docker containers"
+keywords = ["docker", "tui", "tokio", "terminal", "podman"]
+categories = ["command-line-utilities"]
+
+[[bin]]
+name = "oxker"
+path = "src/main.rs"
+
+[dependencies]
+oxker-core = { path = "../oxker-core" }
+anyhow.workspace = true
+cansi.workspace = true
+clap.workspace = true
+crossterm.workspace = true
+directories.workspace = true
+ratatui.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+insta = "1.42.2"

@@ -1192,29 +1192,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
-name = "oxker"
+name = "oxker-core"
 version = "0.11.1"
 dependencies = [
  "anyhow",
  "bollard",
- "cansi",
- "clap",
- "crossterm 0.29.0",
- "directories",
  "futures-util",
- "insta",
  "jiff",
  "parking_lot",
- "ratatui",
  "serde",
  "serde_json",
- "serde_jsonc",
  "tokio",
  "tokio-util",
  "toml",
  "tracing",
- "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "oxker-tui"
+version = "0.11.1"
+dependencies = [
+ "anyhow",
+ "cansi",
+ "clap",
+ "crossterm 0.29.0",
+ "directories",
+ "insta",
+ "oxker-core",
+ "ratatui",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1519,17 +1528,6 @@ checksum = "d401abef1d108fbd9cbaebc3e46611f4b1021f714a0597a71f41ee463f5f4a5a"
 dependencies = [
  "itoa",
  "memchr",
- "ryu",
- "serde",
-]
-
-[[package]]
-name = "serde_jsonc"
-version = "1.0.108"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a58154381df481a41b7536101c0daccdaf2426f244334074c4c77b89b6253a7"
-dependencies = [
- "itoa",
  "ryu",
  "serde",
 ]
