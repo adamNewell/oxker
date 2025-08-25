@@ -86,9 +86,7 @@ fn generate_block<'a>(
         .update_region_map(Region::Panel(panel), area);
 
     let mut title = match panel {
-        SelectablePanel::Containers => {
-            fd.container_title.clone()
-        }
+        SelectablePanel::Containers => fd.container_title.clone(),
         SelectablePanel::Logs => {
             // Use the full title from the view model
             fd.log_view.title.clone()
@@ -128,16 +126,16 @@ pub mod tests {
     use parking_lot::Mutex;
     use ratatui::{Terminal, backend::TestBackend, layout::Rect, style::Color};
 
-    use oxker_core::{
-        AppData, ContainerId, ContainerImage, ContainerName, ContainerPorts, ContainerItem,
-        AppError, Columns, Header, FilterBy, AppColors, Keymap, SortedOrder,
-    };
     use crate::{
         test_utils::test_utils::{gen_appdata, gen_containers},
-        ui::{GuiState, Rerender, Status, FrameViewModel},
+        ui::{FrameViewModel, GuiState, Rerender, Status},
+    };
+    use oxker_core::{
+        AppColors, AppData, AppError, Columns, ContainerId, ContainerImage, ContainerItem,
+        ContainerName, ContainerPorts, FilterBy, Header, Keymap, SortedOrder,
     };
 
-    use super::{headers, error, help, containers, logs};
+    use super::{containers, error, headers, help, logs};
 
     pub struct TuiTestSetup {
         pub gui_state: Arc<Mutex<GuiState>>,
@@ -152,19 +150,19 @@ pub mod tests {
     pub const COLOR_RX: Color = Color::Rgb(255, 233, 193);
     pub const COLOR_TX: Color = Color::Rgb(205, 140, 140);
     pub const COLOR_ORANGE: Color = Color::Rgb(255, 178, 36);
-    
+
     /// Helper function to create test setup with custom container modifications
-    pub fn test_setup_custom<F>(w: u16, h: u16, modifier: F) -> TuiTestSetup 
+    pub fn test_setup_custom<F>(w: u16, h: u16, modifier: F) -> TuiTestSetup
     where
-        F: FnOnce(&mut Vec<ContainerItem>)
+        F: FnOnce(&mut Vec<ContainerItem>),
     {
         let backend = TestBackend::new(w, h);
         let terminal = Terminal::new(backend).unwrap();
         let (ids, mut containers) = gen_containers();
-        
+
         // Apply custom modifications
         modifier(&mut containers);
-        
+
         let config = crate::test_utils::test_utils::gen_config();
         let redraw = Arc::new(Rerender::new());
         let gui_state = GuiState::new(&redraw, config.show_logs);
@@ -172,7 +170,7 @@ pub mod tests {
         let fd = create_test_frame_view_model(&gui_state);
         let area = Rect::new(0, 0, w, h);
         gui_state.lock().set_screen_width(w);
-        
+
         TuiTestSetup {
             gui_state,
             fd,
@@ -182,7 +180,7 @@ pub mod tests {
             config,
         }
     }
-    
+
     /// Helper function to create test setup with containers with no ports
     pub fn test_setup_no_ports(w: u16, h: u16) -> TuiTestSetup {
         test_setup_custom(w, h, |containers| {
@@ -191,7 +189,7 @@ pub mod tests {
             }
         })
     }
-    
+
     /// Helper function to create test setup with containers in specific state
     pub fn test_setup_with_state(w: u16, h: u16, state: oxker_core::State) -> TuiTestSetup {
         test_setup_custom(w, h, |containers| {
@@ -200,7 +198,7 @@ pub mod tests {
             }
         })
     }
-    
+
     /// Helper function to create test setup with multiple ports
     pub fn test_setup_multiple_ports(w: u16, h: u16) -> TuiTestSetup {
         test_setup_custom(w, h, |containers| {
@@ -228,19 +226,16 @@ pub mod tests {
         fd: &FrameViewModel,
         gui_state: &Arc<Mutex<GuiState>>,
     ) {
-        use ratatui::layout::{Layout, Direction, Constraint};
-        
+        use ratatui::layout::{Constraint, Direction, Layout};
+
         let whole_layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Min(7),
-                Constraint::Percentage(100),
-            ])
+            .constraints([Constraint::Min(7), Constraint::Percentage(100)])
             .split(f.area());
-        
+
         // Draw headers
         headers::draw(whole_layout[0], colors, f, fd, gui_state, keymap);
-        
+
         // Draw main content based on status
         if fd.status.contains(&Status::Error) {
             // Note: error draw needs an AppError and seconds parameter
@@ -251,30 +246,25 @@ pub mod tests {
             // Draw normal content
             let main_chunks = Layout::default()
                 .direction(Direction::Horizontal)
-                .constraints([
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(50),
-                ])
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(whole_layout[1]);
-            
+
             let container_state = Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
             containers::draw(&container_state, main_chunks[0], colors, f, fd, gui_state);
-            
+
             let right_chunks = Layout::default()
                 .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(50),
-                ])
+                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)])
                 .split(main_chunks[1]);
-            
+
             if fd.show_logs {
-                let container_state = Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
+                let container_state =
+                    Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
                 logs::draw(&container_state, right_chunks[1], colors, f, fd, gui_state);
             }
         }
     }
-    
+
     // Test helper to create a minimal FrameViewModel for tests
     fn create_test_frame_view_model(gui_state: &Arc<Mutex<GuiState>>) -> FrameViewModel {
         println!("TEST: create_test_frame_view_model - start");
@@ -282,27 +272,30 @@ pub mod tests {
         println!("TEST: create_test_frame_view_model - end");
         result
     }
-    
+
     // Test helper to create a FrameViewModel with specific number of containers
-    fn create_test_frame_view_model_with_containers(gui_state: &Arc<Mutex<GuiState>>, num_containers: usize) -> FrameViewModel {
+    fn create_test_frame_view_model_with_containers(
+        gui_state: &Arc<Mutex<GuiState>>,
+        num_containers: usize,
+    ) -> FrameViewModel {
         create_test_frame_view_model_with_containers_custom(gui_state, num_containers, |_| {})
     }
-    
+
     // Test helper to create a FrameViewModel with custom modifications
     fn create_test_frame_view_model_with_containers_custom<F>(
-        gui_state: &Arc<Mutex<GuiState>>, 
+        gui_state: &Arc<Mutex<GuiState>>,
         num_containers: usize,
-        modifier: F
-    ) -> FrameViewModel 
+        modifier: F,
+    ) -> FrameViewModel
     where
-        F: FnOnce(&mut FrameViewModel)
+        F: FnOnce(&mut FrameViewModel),
     {
         println!("TEST: create_test_frame_view_model_with_containers_custom - start");
-        use crate::ui::view_models::{ContainerView, LogView, CommandsView, ChartData, PortView};
         use crate::handlers::UIContainerState;
+        use crate::ui::view_models::{ChartData, CommandsView, ContainerView, LogView, PortView};
+        use oxker_core::{ByteStats, ContainerPorts, CpuStats, DockerCommand};
         use std::collections::HashSet;
-        use oxker_core::{CpuStats, ByteStats, DockerCommand, ContainerPorts};
-        
+
         // Generate test containers
         let containers: Vec<ContainerView> = (1..=num_containers)
             .map(|i| ContainerView {
@@ -318,28 +311,56 @@ pub mod tests {
                 tx: ByteStats::new(2000),
             })
             .collect();
-        
+
         let has_containers = !containers.is_empty();
         let selected_container = if has_containers { Some(0) } else { None };
-        
+
         // Create chart data for selected container
         let chart_data = if has_containers {
             Some(ChartData {
-                cpu_data: (vec![
-                    (0.0, 1.0), (1.0, 2.0), (2.0, 3.0), (3.0, 3.0), (4.0, 2.0),
-                    (5.0, 1.0), (6.0, 1.0), (7.0, 2.0), (8.0, 3.0), (9.0, 3.0),
-                    (10.0, 1.0), (11.0, 2.0), (12.0, 3.0)
-                ], CpuStats::new(10.0), oxker_core::State::Running(oxker_core::RunningState::Healthy)),
-                mem_data: (vec![
-                    (0.0, 10000.0), (1.0, 20000.0), (2.0, 30000.0), (3.0, 30000.0), (4.0, 20000.0),
-                    (5.0, 10000.0), (6.0, 10000.0), (7.0, 20000.0), (8.0, 30000.0), (9.0, 30000.0),
-                    (10.0, 10000.0), (11.0, 20000.0), (12.0, 30000.0)
-                ], ByteStats::new(100000), oxker_core::State::Running(oxker_core::RunningState::Healthy)),
+                cpu_data: (
+                    vec![
+                        (0.0, 1.0),
+                        (1.0, 2.0),
+                        (2.0, 3.0),
+                        (3.0, 3.0),
+                        (4.0, 2.0),
+                        (5.0, 1.0),
+                        (6.0, 1.0),
+                        (7.0, 2.0),
+                        (8.0, 3.0),
+                        (9.0, 3.0),
+                        (10.0, 1.0),
+                        (11.0, 2.0),
+                        (12.0, 3.0),
+                    ],
+                    CpuStats::new(10.0),
+                    oxker_core::State::Running(oxker_core::RunningState::Healthy),
+                ),
+                mem_data: (
+                    vec![
+                        (0.0, 10000.0),
+                        (1.0, 20000.0),
+                        (2.0, 30000.0),
+                        (3.0, 30000.0),
+                        (4.0, 20000.0),
+                        (5.0, 10000.0),
+                        (6.0, 10000.0),
+                        (7.0, 20000.0),
+                        (8.0, 30000.0),
+                        (9.0, 30000.0),
+                        (10.0, 10000.0),
+                        (11.0, 20000.0),
+                        (12.0, 30000.0),
+                    ],
+                    ByteStats::new(100000),
+                    oxker_core::State::Running(oxker_core::RunningState::Healthy),
+                ),
             })
         } else {
             None
         };
-        
+
         // Create port view for selected container
         let port_view = if has_containers {
             Some(PortView {
@@ -354,11 +375,15 @@ pub mod tests {
         } else {
             None
         };
-        
+
         // Create log view
         let log_view = LogView {
             logs: if has_containers {
-                vec!["1 line 1".to_string(), "2 line 2".to_string(), "3 line 3".to_string()]
+                vec![
+                    "1 line 1".to_string(),
+                    "2 line 2".to_string(),
+                    "3 line 3".to_string(),
+                ]
             } else {
                 vec![]
             },
@@ -368,7 +393,7 @@ pub mod tests {
                 "No container selected".to_string()
             },
         };
-        
+
         // Create commands view
         let commands_view = CommandsView {
             commands: vec![
@@ -380,9 +405,9 @@ pub mod tests {
                 DockerCommand::Delete,
             ],
         };
-        
+
         println!("TEST: About to create FrameViewModel");
-        
+
         // Get all gui_state values in a single lock
         let (delete_confirm, info_text, is_loading, loading_icon, log_height, show_logs, status) = {
             println!("TEST: Acquiring gui_state lock");
@@ -401,7 +426,7 @@ pub mod tests {
             result
         };
         println!("TEST: Released gui_state lock");
-        
+
         let mut result = FrameViewModel {
             containers,
             selected_container,
@@ -440,27 +465,32 @@ pub mod tests {
             sorted_by: Some((Header::State, SortedOrder::Asc)),
             status,
         };
-        
+
         modifier(&mut result);
         result
     }
 
     /// Generate state to be used in *most* gui tests
-    pub fn test_setup(w: u16, h: u16, _control_start: bool, _container_start: bool) -> TuiTestSetup {
+    pub fn test_setup(
+        w: u16,
+        h: u16,
+        _control_start: bool,
+        _container_start: bool,
+    ) -> TuiTestSetup {
         let backend = TestBackend::new(w, h);
         let terminal = Terminal::new(backend).unwrap();
 
         let (ids, _containers) = gen_containers();
         let config = crate::test_utils::test_utils::gen_config();
-        
+
         let redraw = Arc::new(Rerender::new());
         let gui_state = GuiState::new(&redraw, config.show_logs);
         let gui_state = Arc::new(Mutex::new(gui_state));
-        
+
         let fd = create_test_frame_view_model(&gui_state);
         let area = Rect::new(0, 0, w, h);
         gui_state.lock().set_screen_width(w);
-        
+
         TuiTestSetup {
             gui_state,
             fd,
@@ -503,22 +533,26 @@ pub mod tests {
     /// Debug test to see what's being rendered
     fn test_debug_output() {
         println!("TEST: Starting test_debug_output");
-        
+
         let mut setup = test_setup(40, 10, true, true);
         println!("TEST: test_setup completed");
-        
+
         let fd = create_test_frame_view_model(&setup.gui_state);
         println!("TEST: create_test_frame_view_model completed");
-        
+
         let colors = setup.config.app_colors;
         let keymap = setup.config.keymap.clone();
-        
-        setup.terminal.draw(|f| {
-            // Just draw containers block for simpler test
-            let container_state = Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
-            containers::draw(&container_state, f.area(), colors, f, &fd, &setup.gui_state);
-        }).unwrap();
-        
+
+        setup
+            .terminal
+            .draw(|f| {
+                // Just draw containers block for simpler test
+                let container_state =
+                    Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
+                containers::draw(&container_state, f.area(), colors, f, &fd, &setup.gui_state);
+            })
+            .unwrap();
+
         // Write output to file
         use std::io::Write;
         let mut file = std::fs::File::create("/tmp/oxker_test_output.txt").unwrap();
@@ -530,11 +564,11 @@ pub mod tests {
                 .collect();
             writeln!(file, "Line {}: {}", y, line.trim_end()).unwrap();
         }
-        
+
         // Simple assertion
         assert_eq!(1, 1);
     }
-    
+
     #[test]
     /// Check that the whole layout is drawn correctly
     fn test_draw_blocks_whole_layout() {
@@ -542,7 +576,7 @@ pub mod tests {
 
         insert_chart_data(&setup);
         insert_logs(&setup);
-        
+
         // Create frame data that matches the original snapshot
         let fd = create_test_frame_view_model_with_containers_custom(&setup.gui_state, 3, |fd| {
             // Update container data to match snapshot
@@ -550,12 +584,16 @@ pub mod tests {
                 fd.containers[1].status = "Up 2 hour".to_string();
                 fd.containers[2].status = "Up 3 hour".to_string();
             }
-            
+
             // Update log data to match snapshot
-            fd.log_view.logs = vec!["line 1".to_string(), "line 2".to_string(), "line 3".to_string()];
-            fd.log_view.position = 2; // Selected line 3
+            fd.log_view.logs = vec![
+                "line 1".to_string(),
+                "line 2".to_string(),
+                "line 3".to_string(),
+            ];
+            // fd.log_view.position = 2; // Selected line 3 - position field doesn't exist
             fd.log_view.title = "container_1 - image_1".to_string();
-            
+
             // Add the additional port that the snapshot expects
             if let Some(ref mut port_view) = fd.port_view {
                 port_view.ports.push(ContainerPorts {
@@ -567,10 +605,10 @@ pub mod tests {
                 port_view.max_lens = (9, 4, 4); // "127.0.0.1", "8003", "8003"
             }
         });
-        
+
         let colors = setup.config.app_colors;
         let keymap = setup.config.keymap.clone();
-        
+
         setup
             .terminal
             .draw(|f| {
@@ -760,10 +798,7 @@ pub mod tests {
         // e.g., setup container with additional ports through TestContainerBuilder
         let colors = setup.config.app_colors;
         let keymap = setup.config.keymap.clone();
-        setup
-            .gui_state
-            .lock()
-            .set_delete_container(None); // Note: Would get container ID from UIContainerState
+        setup.gui_state.lock().set_delete_container(None); // Note: Would get container ID from UIContainerState
 
         let fd = create_test_frame_view_model(&setup.gui_state);
         setup
