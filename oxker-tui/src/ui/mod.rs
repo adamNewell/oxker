@@ -23,16 +23,19 @@ use tracing::error;
 mod draw_blocks;
 mod gui_state;
 mod redraw;
+mod view_models;
 pub use redraw::Rerender;
+pub use view_models::{FrameViewModel, ContainerView, ChartData, PortView, LogView, CommandsView};
 
 pub use self::gui_state::{DeleteButton, GuiState, SelectablePanel, Status};
 use crate::input_handler::InputMessages;
+use crate::handlers::UIContainerState;
 use oxker_core::{
     AppData, AppError,
     AppColors, Keymap,
     ContainerId, State, Header,
     Columns, ContainerPorts, CpuTuple, FilterBy, MemTuple, SortedOrder,
-    TerminalSize,
+    TerminalSize, Config,
 };
 
 const POLL_RATE: Duration = std::time::Duration::from_millis(50);
@@ -40,7 +43,8 @@ const POLL_RATE: Duration = std::time::Duration::from_millis(50);
 // could have a render struct, which takes in poll rate, and docker
 
 pub struct Ui {
-    app_data: Arc<Mutex<AppData>>,
+    container_state: Arc<Mutex<UIContainerState>>,
+    config: Config,
     cursor_position: Position,
     gui_state: Arc<Mutex<GuiState>>,
     input_tx: Sender<InputMessages>,
@@ -65,7 +69,8 @@ impl Ui {
 
     /// Create a new Ui struct, and execute the drawing loop
     pub async fn start(
-        app_data: Arc<Mutex<AppData>>,
+        container_state: Arc<Mutex<UIContainerState>>,
+        config: Config,
         gui_state: Arc<Mutex<GuiState>>,
         input_tx: Sender<InputMessages>,
         is_running: Arc<AtomicBool>,
@@ -75,7 +80,8 @@ impl Ui {
             Ok(mut terminal) => {
                 let cursor_position = terminal.get_cursor_position().unwrap_or_default();
                 let mut ui = Self {
-                    app_data,
+                    container_state,
+                    config,
                     cursor_position,
                     gui_state,
                     input_tx,
@@ -130,8 +136,8 @@ impl Ui {
     /// Draw the the error message ui, for 5 seconds, with a countdown
     fn err_loop(&mut self) -> Result<(), AppError> {
         let mut seconds = 5;
-        let colors = self.app_data.lock().config.app_colors;
-        let keymap = self.app_data.lock().config.keymap.clone();
+        let colors = self.config.app_colors;
+        let keymap = self.config.keymap.clone();
         let mut redraw = true;
         loop {
             if self.now.elapsed() >= std::time::Duration::from_secs(1) {
@@ -180,7 +186,8 @@ impl Ui {
             self.reset_terminal().ok();
             self.terminal.clear().ok();
             if let Err(e) = mode.run(TerminalSize::new(&self.terminal)).await {
-                self.app_data.lock().set_error(e);
+                // TODO: Need to handle errors differently now that we don't have AppData
+                // For now, just update the gui_state
                 self.gui_state.lock().status_push(Status::Error);
             }
         }
@@ -203,9 +210,9 @@ impl Ui {
 
     /// The loop for drawing the main UI to the terminal
     async fn gui_loop(&mut self) -> Result<(), AppError> {
-        let colors = self.app_data.lock().config.app_colors;
-        let keymap = self.app_data.lock().config.keymap.clone();
-        let docker_interval_ms = u128::from(self.app_data.lock().config.docker_interval_ms);
+        let colors = self.config.app_colors;
+        let keymap = self.config.keymap.clone();
+        let docker_interval_ms = u128::from(self.config.docker_interval_ms);
         let mut drawn_at = std::time::Instant::now();
 
         if let Ok(size) = self.terminal.size() {
@@ -218,7 +225,13 @@ impl Ui {
             //     continue;
             // }
             if self.should_redraw(&mut drawn_at, docker_interval_ms) {
-                let fd = FrameData::from(&*self);
+                let screen_width = self.gui_state.lock().get_screen_width();
+                let fd = FrameViewModel::from_state(
+                    &*self.container_state.lock(),
+                    &*self.gui_state.lock(),
+                    colors,
+                    screen_width,
+                );
 
                 let exec = fd.status.contains(&Status::Exec);
                 if exec {
@@ -228,7 +241,7 @@ impl Ui {
                 if self
                     .terminal
                     .draw(|frame| {
-                        draw_frame(&self.app_data, colors, &keymap, frame, &fd, &self.gui_state);
+                        draw_frame(&self.container_state, &self.config, colors, &keymap, frame, &fd, &self.gui_state);
                     })
                     .is_err()
                 {
@@ -281,71 +294,15 @@ impl Ui {
     }
 }
 
-/// Frequent data required by multiple frame drawing functions, can reduce mutex reads by placing it all in here
-#[derive(Debug, Clone)]
-#[allow(clippy::struct_excessive_bools)]
-pub struct FrameData {
-    chart_data: Option<(CpuTuple, MemTuple)>,
-    color_logs: bool,
-    columns: Columns,
-    container_title: String,
-    delete_confirm: Option<ContainerId>,
-    filter_by: FilterBy,
-    filter_term: Option<String>,
-    has_containers: bool,
-    log_height: u16,
-    show_logs: bool,
-    has_error: Option<AppError>,
-    info_text: Option<(String, Instant)>,
-    is_loading: bool,
-    loading_icon: String,
-    log_title: String,
-    port_max_lens: (usize, usize, usize),
-    ports: Option<(Vec<ContainerPorts>, State)>,
-    selected_panel: SelectablePanel,
-    scroll_title: Option<String>,
-    sorted_by: Option<(Header, SortedOrder)>,
-    status: HashSet<Status>,
-}
-
-impl From<&Ui> for FrameData {
-    fn from(ui: &Ui) -> Self {
-        let (mut app_data, gui_data) = (ui.app_data.lock(), ui.gui_state.lock());
-
-        let (filter_by, filter_term) = app_data.get_filter();
-        Self {
-            chart_data: app_data.get_chart_data(),
-            color_logs: app_data.config.color_logs,
-            columns: app_data.get_width(),
-            container_title: app_data.get_container_title(),
-            delete_confirm: gui_data.get_delete_container(),
-            filter_by,
-            filter_term: filter_term.cloned(),
-            has_containers: app_data.get_container_len() > 0,
-            has_error: app_data.get_error(),
-            info_text: gui_data.info_box_text.clone(),
-            is_loading: gui_data.is_loading(),
-            show_logs: gui_data.get_show_logs(),
-            loading_icon: gui_data.get_loading().to_string(),
-            log_height: gui_data.get_log_height(),
-            log_title: app_data.get_log_title(),
-            port_max_lens: app_data.get_longest_port(),
-            ports: app_data.get_selected_ports(),
-            scroll_title: app_data.get_scroll_title(gui_data.get_screen_width()),
-            selected_panel: gui_data.get_selected_panel(),
-            sorted_by: app_data.get_sorted(),
-            status: gui_data.get_status(),
-        }
-    }
-}
 
 /// Draw the main ui to a frame of the terminal
 fn draw_frame(
-    app_data: &Arc<Mutex<AppData>>,
+    container_state: &Arc<Mutex<UIContainerState>>,
+    config: &Config,
     colors: AppColors,
     keymap: &Keymap,
     f: &mut Frame,
-    fd: &FrameData,
+    fd: &FrameViewModel,
     gui_state: &Arc<Mutex<GuiState>>,
 ) {
     let whole_layout = Layout::default()
@@ -392,11 +349,11 @@ fn draw_frame(
         })
         .split(containers_logs_section[0]);
 
-    draw_blocks::containers::draw(app_data, containers_commands[0], colors, f, fd, gui_state);
+    draw_blocks::containers::draw(container_state, containers_commands[0], colors, f, fd, gui_state);
 
     if fd.show_logs {
         draw_blocks::logs::draw(
-            app_data,
+            container_state,
             containers_logs_section[1],
             colors,
             f,
@@ -406,26 +363,33 @@ fn draw_frame(
     }
 
     if let Some(id) = fd.delete_confirm.as_ref() {
-        app_data.lock().get_container_name_by_id(id).map_or_else(
-            || {
-                // If a container is deleted outside of oxker but whilst the Delete Confirm dialog is open, it can get caught in kind of a dead lock situation
-                // so if in that unique situation, just clear the delete_container id
-                gui_state.lock().set_delete_container(None);
-            },
-            |name| {
-                draw_blocks::delete_confirm::draw(colors, f, gui_state, keymap, name);
-            },
-        );
+        // Find container name from UIContainerState
+        let container_name = container_state.lock()
+            .get_container_items()
+            .iter()
+            .find(|c| &c.id == id)
+            .map(|c| c.name.clone());
+            
+        if let Some(name) = container_name {
+            draw_blocks::delete_confirm::draw(colors, f, gui_state, keymap, &name);
+        } else {
+            // If a container is deleted outside of oxker but whilst the Delete Confirm dialog is open, it can get caught in kind of a dead lock situation
+            // so if in that unique situation, just clear the delete_container id
+            gui_state.lock().set_delete_container(None);
+        }
     }
 
     // only draw commands + charts if there are containers
     if let Some(rect) = containers_commands.get(1) {
-        draw_blocks::commands::draw(app_data, *rect, colors, f, fd, gui_state);
+        draw_blocks::commands::draw(container_state, *rect, colors, f, fd, gui_state);
 
         // Can calculate the max string length here, and then use that to keep the ports section as small as possible (+4 for some padding + border)
-        let ports_len =
-            u16::try_from(fd.port_max_lens.0 + fd.port_max_lens.1 + fd.port_max_lens.2 + 2)
-                .unwrap_or(26);
+        let ports_len = if let Some(port_view) = &fd.port_view {
+            u16::try_from(port_view.max_lens.0 + port_view.max_lens.1 + port_view.max_lens.2 + 2)
+                .unwrap_or(26)
+        } else {
+            26
+        };
 
         let lower = Layout::default()
             .direction(Direction::Horizontal)
@@ -442,12 +406,12 @@ fn draw_frame(
 
     // Check if error, and show popup if so
     if fd.status.contains(&Status::Help) {
-        let tz = app_data.lock().config.timezone.clone();
+        let tz = config.timezone.clone();
         draw_blocks::help::draw(
             colors,
             f,
             keymap,
-            app_data.lock().config.show_timestamp,
+            config.show_timestamp,
             tz.as_ref(),
         );
     }

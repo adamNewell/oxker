@@ -10,11 +10,11 @@ use ratatui::{
 
 use super::{CONSTRAINT_100, MARGIN};
 use oxker_core::{Header, SortedOrder, AppColors, Keymap};
-use crate::ui::{FrameData, GuiState, Status, gui_state::Region};
+use crate::ui::{FrameViewModel, GuiState, Status, gui_state::Region};
 /// Generate a header paragraph with it's width
 fn gen_header<'a>(
     colors: AppColors,
-    fd: &FrameData,
+    fd: &FrameViewModel,
     header: Header,
     width: usize,
 ) -> (Paragraph<'a>, u16) {
@@ -32,7 +32,7 @@ fn gen_header<'a>(
 }
 
 // Generate a block for the header, if the header is currently being used to sort a column, then highlight it white
-fn gen_header_block<'a>(colors: AppColors, fd: &FrameData, header: Header) -> (Color, &'a str) {
+fn gen_header_block<'a>(colors: AppColors, fd: &FrameViewModel, header: Header) -> (Color, &'a str) {
     let mut color = colors.headers_bar.text;
     let mut suffix = "";
     if let Some((a, b)) = &fd.sorted_by {
@@ -56,7 +56,7 @@ fn gen_style(bg: Option<Color>, fg: Color) -> Style {
 }
 
 /// Generate the text to display on the show help section, as can change with a custom keymap
-fn gen_help_text(fd: &FrameData, keymap: &Keymap) -> String {
+fn gen_help_text(fd: &FrameViewModel, keymap: &Keymap) -> String {
     let suffix = if fd.status.contains(&Status::Help) {
         "exit"
     } else {
@@ -79,7 +79,7 @@ fn gen_help_text(fd: &FrameData, keymap: &Keymap) -> String {
 fn draw_help(
     colors: AppColors,
     f: &mut Frame,
-    fd: &FrameData,
+    fd: &FrameViewModel,
     help_text: String,
     gui_state: &Arc<Mutex<GuiState>>,
     split_bar: &Rc<[Rect]>,
@@ -103,7 +103,7 @@ fn draw_help(
 }
 
 // Draw loading icon, or not, and a prefix with a single space
-fn draw_loading_spinner(colors: AppColors, f: &mut Frame, fd: &FrameData, rect: Rect) {
+fn draw_loading_spinner(colors: AppColors, f: &mut Frame, fd: &FrameViewModel, rect: Rect) {
     let loading_paragraph = Paragraph::new(format!("{:>2}", fd.loading_icon))
         .style(gen_style(None, colors.headers_bar.loading_spinner))
         .alignment(Alignment::Left);
@@ -114,7 +114,7 @@ fn draw_loading_spinner(colors: AppColors, f: &mut Frame, fd: &FrameData, rect: 
 fn draw_columns(
     colors: AppColors,
     f: &mut Frame,
-    fd: &FrameData,
+    fd: &FrameViewModel,
     gui_state: &Arc<Mutex<GuiState>>,
     split_bar: &Rc<[Rect]>,
 ) {
@@ -170,7 +170,7 @@ pub fn draw(
     area: Rect,
     colors: AppColors,
     f: &mut Frame,
-    fd: &FrameData,
+    fd: &FrameViewModel,
     gui_state: &Arc<Mutex<GuiState>>,
     keymap: &Keymap,
 ) {
@@ -221,7 +221,7 @@ mod tests {
     use uuid::Uuid;
 
     use oxker_core::{Header, SortedOrder, AppColors, Keymap};
-use crate::ui::FrameData;
+use crate::ui::FrameViewModel;
     // Placeholder test
     #[test]
     fn test_placeholder() {

@@ -6,4 +6,4 @@ pub mod ui;
 pub mod utils;
 
 #[cfg(test)]
-mod test_utils;
+pub mod test_utils;

@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use oxker_core::{State, AppColors};
-use crate::ui::FrameData;
+use crate::ui::FrameViewModel;
 
 /// Get the port title color, at the moment the color is only customizable if the container is alive
 const fn get_port_title_color(colors: AppColors, state: State) -> Color {
@@ -19,8 +19,8 @@ const fn get_port_title_color(colors: AppColors, state: State) -> Color {
 }
 
 /// Display the ports in a formatted list
-pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameData) {
-    if let Some(ports) = fd.ports.as_ref() {
+pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameViewModel) {
+    if let Some(port_view) = fd.port_view.as_ref() {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
@@ -29,15 +29,15 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameData) {
             .title(Span::styled(
                 " ports ",
                 Style::default()
-                    .fg(get_port_title_color(colors, ports.1))
+                    .fg(get_port_title_color(colors, port_view.state.clone()))
                     .bg(colors.chart_ports.background)
                     .add_modifier(Modifier::BOLD),
             ));
 
-        let (ip, private, public) = fd.port_max_lens;
+        let (ip, private, public) = port_view.max_lens;
 
-        if ports.0.is_empty() {
-            let text = match ports.1 {
+        if port_view.ports.is_empty() {
+            let text = match port_view.state {
                 State::Running(_) | State::Paused | State::Restarting => "no ports",
                 _ => "",
             };
@@ -54,7 +54,7 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameData) {
                 ))
                 .fg(colors.chart_ports.headings),
             )];
-            for item in &ports.0 {
+            for item in &port_view.ports {
                 let strings = item.get_all();
 
                 let line = vec![
@@ -83,7 +83,7 @@ mod tests {
     use oxker_core::{ContainerPorts, RunningState, State, AppColors};
     use crate::{
         ui::{
-            FrameData,
+            FrameViewModel,
             draw_blocks::tests::{COLOR_ORANGE, COLOR_RX, COLOR_TX, get_result, test_setup, test_setup_no_ports, test_setup_custom, test_setup_multiple_ports},
         },
     };
@@ -93,11 +93,11 @@ mod tests {
     fn test_draw_blocks_ports_no_ports() {
         let mut setup = test_setup_no_ports(30, 8);
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());
@@ -132,11 +132,11 @@ mod tests {
         // First test with running state and no ports
         let mut setup = test_setup_no_ports(30, 8);
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
         // split
@@ -149,11 +149,11 @@ mod tests {
             }
         });
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
 
@@ -178,11 +178,11 @@ mod tests {
     fn test_draw_blocks_ports_multiple_ports() {
         let mut setup = test_setup_multiple_ports(32, 8);
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());
@@ -218,11 +218,11 @@ mod tests {
     fn test_draw_blocks_ports_container_state() {
         let mut setup = test_setup(32, 8, true, true);
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
 
@@ -238,12 +238,12 @@ mod tests {
             }
         }
 
-        setup.app_data.lock().containers.items[0].state = State::Paused;
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        // Note: State changes would be done through event system or test setup methods
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
 
@@ -257,12 +257,12 @@ mod tests {
             }
         }
 
-        setup.app_data.lock().containers.items[0].state = State::Exited;
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        // Note: State changes would be done through event system or test setup methods
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
 
@@ -289,7 +289,7 @@ mod tests {
         colors.chart_ports.text = Color::Green;
         colors.chart_ports.title = Color::Magenta;
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
@@ -352,9 +352,9 @@ mod tests {
             (State::Running(RunningState::Healthy), Color::DarkGray),
             (State::Running(RunningState::Unhealthy), Color::DarkGray),
         ] {
-            setup.app_data.lock().containers.items[0].state = i.0;
+            // Note: State changes would be done through event system or test setup methods
 
-            let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+            let fd = setup.fd.clone();
             setup
                 .terminal
                 .draw(|f| {

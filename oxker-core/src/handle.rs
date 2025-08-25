@@ -371,12 +371,6 @@ impl CoreHandle {
         self.app_data.lock().is_oxker()
     }
     
-    /// TEMPORARY: Get AppData reference for UI during migration
-    /// This method will be removed once UIEventHandler is complete
-    #[doc(hidden)]
-    pub fn get_app_data_for_ui(&self) -> Arc<Mutex<AppData>> {
-        Arc::clone(&self.app_data)
-    }
 }
 
 /// A read-only view of the core state.

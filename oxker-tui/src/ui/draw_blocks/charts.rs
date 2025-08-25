@@ -9,7 +9,8 @@ use ratatui::{
     widgets::{Axis, Block, BorderType, Borders, Chart, Dataset, GraphType},
 };
 
-use super::{CONSTRAINT_50_50, FrameData};
+use crate::ui::FrameViewModel;
+use super::CONSTRAINT_50_50;
 use oxker_core::{ByteStats, CpuStats, State, Stats, AppColors};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -114,8 +115,10 @@ fn make_chart<'a, T: Stats + Display>(
 }
 
 /// Draw the cpu + mem charts
-pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameData) {
-    if let Some((cpu, mem)) = fd.chart_data.as_ref() {
+pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameViewModel) {
+    if let Some(chart_data) = fd.chart_data.as_ref() {
+        let cpu = &chart_data.cpu_data;
+        let mem = &chart_data.mem_data;
         let area = Layout::default()
             .direction(Direction::Horizontal)
             .constraints(CONSTRAINT_50_50)
@@ -169,10 +172,8 @@ mod tests {
 
     use oxker_core::{State, AppColors};
     use crate::{
-        ui::{
-            FrameData,
-            draw_blocks::tests::{COLOR_ORANGE, get_result, insert_chart_data, test_setup, test_setup_with_state},
-        },
+        ui::FrameViewModel,
+        ui::draw_blocks::tests::{COLOR_ORANGE, get_result, insert_chart_data, test_setup, test_setup_with_state},
     };
 
     /// CPU and Memory charts used in multiple tests, based on data from above insert_chart_data()
@@ -233,11 +234,11 @@ mod tests {
     fn test_draw_blocks_charts_running_none() {
         let mut setup = test_setup(80, 10, true, true);
 
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());
@@ -272,12 +273,12 @@ mod tests {
         let mut setup = test_setup(80, 10, true, true);
 
         insert_chart_data(&setup);
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
 
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
 
@@ -321,12 +322,12 @@ mod tests {
         let mut setup = test_setup_with_state(80, 10, State::Paused);
 
         insert_chart_data(&setup);
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
 
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
 
@@ -365,12 +366,12 @@ mod tests {
     fn test_draw_blocks_charts_dead() {
         let mut setup = test_setup_with_state(80, 10, State::Dead);
         insert_chart_data(&setup);
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
 
         setup
             .terminal
             .draw(|f| {
-                super::draw(setup.area, setup.app_data.lock().config.app_colors, f, &fd);
+                super::draw(setup.area, setup.config.app_colors, f, &fd);
             })
             .unwrap();
         assert_snapshot!(setup.terminal.backend());
@@ -424,7 +425,7 @@ mod tests {
         let mut setup = test_setup(80, 10, true, true);
 
         insert_chart_data(&setup);
-        let fd = FrameData::from((&setup.app_data, &setup.gui_state));
+        let fd = setup.fd.clone();
 
         setup
             .terminal

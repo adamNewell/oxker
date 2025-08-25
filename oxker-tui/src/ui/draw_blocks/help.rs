@@ -461,7 +461,7 @@ mod tests {
     /// println!("{} {} {} {} {}", row_index, result_cell_index, result_cell.symbol(), result_cell.bg, result_cell.fg);
     fn test_draw_blocks_help() {
         let mut setup = test_setup(87, 37, true, true);
-        let tz = setup.app_data.lock().config.timezone.clone();
+        let tz = setup.config.timezone.clone();
 
         setup
             .terminal
@@ -469,7 +469,7 @@ mod tests {
                 super::draw(
                     AppColors::new(),
                     f,
-                    &setup.app_data.lock().config.keymap,
+                    &setup.config.keymap,
                     false,
                     tz.as_ref(),
                 );
@@ -535,7 +535,7 @@ mod tests {
     fn test_draw_blocks_help_custom_colors() {
         let mut setup = test_setup(87, 37, true, true);
         let mut colors = AppColors::new();
-        let tz = setup.app_data.lock().config.timezone.clone();
+        let tz = setup.config.timezone.clone();
 
         colors.popup_help.background = Color::Black;
         colors.popup_help.text = Color::Red;
@@ -547,7 +547,7 @@ mod tests {
                 super::draw(
                     colors,
                     f,
-                    &setup.app_data.lock().config.keymap,
+                    &setup.config.keymap,
                     false,
                     tz.as_ref(),
                 );
@@ -743,7 +743,7 @@ mod tests {
             toggle_mouse_capture: (KeyCode::Char('6'), Some(KeyCode::Char('7'))),
         };
 
-        let tz = setup.app_data.lock().config.timezone.clone();
+        let tz = setup.config.timezone.clone();
 
         setup
             .terminal

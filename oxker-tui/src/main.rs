@@ -86,10 +86,8 @@ async fn main() {
         
         info!("UIEventHandler started");
         
-        // TEMPORARY: Get AppData for UI during migration
-        // This will be removed once UIEventHandler is complete
-        let app_data = core_handle.get_app_data_for_ui();
-        Ui::start(app_data, gui_state, input_tx, is_running, redraw).await;
+        // Pass container state and config to UI
+        Ui::start(container_state, config, gui_state, input_tx, is_running, redraw).await;
         
         // Wait for UI task
         if let Err(e) = ui_task.await {
@@ -139,17 +137,22 @@ pub mod tests {
     /// Default test config, has timestamps turned off
     pub fn gen_config() -> Config {
         Config {
+            app_colors: AppColors::new(),
             color_logs: false,
-            colors: AppColors::default(),
             docker_interval_ms: 1000,
-            enable_fuzzywrites: false,
-            keymap: Keymap::default(),
+            keymap: Keymap::new(),
             show_logs: true,
             show_timestamp: false,
+            timestamp_format: String::new(),
+            timezone: None,
             save_dir: None,
-            timeout: 0,
-            host: None,
             gui: true,
+            show_self: false,
+            in_container: false,
+            raw_logs: false,
+            show_std_err: false,
+            host: None,
+            use_cli: false,
         }
     }
 

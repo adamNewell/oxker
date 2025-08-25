@@ -8,7 +8,7 @@ pub mod test_utils {
         ContainerStatus, CpuStats, ByteStats,
     };
     use crate::handlers::UIContainerState;
-    use crate::ui::{GuiState, Rerender, FrameData, SelectablePanel, Status};
+    use crate::ui::{GuiState, Rerender, FrameViewModel, SelectablePanel, Status};
     use std::collections::{VecDeque, HashSet};
     use std::time::Instant;
     use oxker_core::{FilterBy, Header, SortedOrder};
@@ -266,37 +266,81 @@ pub mod test_utils {
         }
     }
     
-    /// Create FrameData from test components
-    impl From<(&CoreHandle, &Arc<Mutex<GuiState>>, &Arc<Mutex<UIContainerState>>)> for FrameData {
-        fn from(data: (&CoreHandle, &Arc<Mutex<GuiState>>, &Arc<Mutex<UIContainerState>>)) -> Self {
-            let (core_handle, gui_state, container_state) = data;
-            let app_data = core_handle.get_app_data_for_ui();
-            let (mut app_data_lock, gui_data, container_data) = (app_data.lock(), gui_state.lock(), container_state.lock());
-            
-            let (filter_by, filter_term) = app_data_lock.get_filter();
-            FrameData {
-                chart_data: app_data_lock.get_chart_data(),
-                color_logs: app_data_lock.config.color_logs,
-                columns: app_data_lock.get_width(),
-                container_title: app_data_lock.get_container_title(),
-                delete_confirm: gui_data.get_delete_container(),
-                filter_by,
-                filter_term: filter_term.cloned(),
-                has_containers: container_data.get_container_count() > 0,
-                has_error: app_data_lock.get_error(),
-                info_text: gui_data.info_box_text.clone(),
-                is_loading: gui_data.is_loading(),
-                show_logs: gui_data.get_show_logs(),
-                loading_icon: gui_data.get_loading().to_string(),
-                log_height: gui_data.get_log_height(),
-                log_title: app_data_lock.get_log_title(),
-                port_max_lens: app_data_lock.get_longest_port(),
-                ports: app_data_lock.get_selected_ports(),
-                scroll_title: app_data_lock.get_scroll_title(gui_data.get_screen_width()),
-                selected_panel: gui_data.get_selected_panel(),
-                sorted_by: app_data_lock.get_sorted(),
-                status: gui_data.get_status(),
-            }
+    /// Generate test containers
+    pub fn gen_containers() -> (Vec<ContainerId>, Vec<ContainerItem>) {
+        gen_containers_n(3)
+    }
+    
+    pub fn gen_containers_n(n: usize) -> (Vec<ContainerId>, Vec<ContainerItem>) {
+        let mut ids = Vec::new();
+        let items = (1..=n)
+            .map(|index| {
+                let id = ContainerId::from(format!("{}", index).as_str());
+                ids.push(id.clone());
+                gen_item(&id, index)
+            })
+            .collect::<Vec<_>>();
+        (ids, items)
+    }
+    
+    fn gen_item(id: &ContainerId, index: usize) -> ContainerItem {
+        ContainerItem::new(
+            u64::try_from(index).unwrap(),
+            id.clone(),
+            format!("image_{}", index),
+            false,
+            format!("container_{}", index),
+            vec![ContainerPorts {
+                ip: None,
+                private: u16::try_from(index).unwrap_or(1) + 8000,
+                public: Some(u16::try_from(index).unwrap_or(1) + 9000),
+            }],
+            State::Running(RunningState::Healthy),
+            ContainerStatus::from("Up 1 hour".to_owned()),
+        )
+    }
+    
+    /// Generate test AppData
+    pub fn gen_appdata(containers: &[ContainerItem]) -> oxker_core::AppData {
+        use oxker_core::StatefulList;
+        let (event_bus, _receiver) = EventBus::new(100);
+        let event_bus = Arc::new(event_bus);
+        let mut app_data = oxker_core::AppData::new(gen_config(), event_bus);
+        // Note: This is a workaround for tests - containers field is private
+        // In real code, we'd use the public API methods
+        app_data
+    }
+    
+    /// Default test config
+    pub fn gen_config() -> Config {
+        Config {
+            color_logs: false,
+            docker_interval_ms: 1000,
+            gui: true,
+            host: None,
+            show_std_err: false,
+            in_container: false,
+            save_dir: None,
+            raw_logs: false,
+            show_self: false,
+            app_colors: AppColors::new(),
+            keymap: Keymap::new(),
+            timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
+            show_timestamp: false,
+            use_cli: false,
+            show_logs: true,
+            timezone: None,
         }
+    }
+    
+    /// Helper to create FrameViewModel for tests
+    pub fn create_test_frame_view_model(
+        gui_state: &Arc<Mutex<GuiState>>,
+        container_state: &Arc<Mutex<UIContainerState>>,
+        config: &Config,
+    ) -> FrameViewModel {
+        let gui_data = gui_state.lock();
+        let container_data = container_state.lock();
+        FrameViewModel::from_state(&container_data, &gui_data, config.app_colors, gui_data.get_screen_width())
     }
 }
