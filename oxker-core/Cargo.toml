@@ -11,9 +11,15 @@ description = "Core logic for oxker - Docker TUI"
 [dependencies]
 anyhow.workspace = true
 bollard.workspace = true
+clap.workspace = true
+# TODO: Remove these UI dependencies after exec.rs is refactored
+crossterm.workspace = true
+ratatui.workspace = true
+directories.workspace = true
 futures-util.workspace = true
 jiff.workspace = true
 parking_lot.workspace = true
+regex = "1"
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
