@@ -6,8 +6,8 @@ use ratatui::{
 };
 
 use super::{NAME, VERSION, max_line_width, popup};
-use oxker_core::{AppError, AppColors, Keymap};
 use crate::ui::gui_state::BoxLocation;
+use oxker_core::{AppColors, AppError, Keymap};
 
 const SUFFIX_CLEAR: &str = "clear error";
 const SUFFIX_QUIT: &str = "quit oxker";
@@ -89,7 +89,7 @@ pub fn draw(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use oxker_core::{AppError, AppColors, Keymap};
+    use oxker_core::{AppColors, AppError, Keymap};
 
     // Placeholder test
     #[test]

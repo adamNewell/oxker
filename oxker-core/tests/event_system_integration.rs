@@ -1,4 +1,4 @@
-use oxker_core::{CoreCommand, CoreEvent, EventBus, CoreHandle, Config, AppColors, Keymap};
+use oxker_core::{AppColors, Config, CoreCommand, CoreEvent, CoreHandle, EventBus, Keymap};
 
 fn gen_config() -> Config {
     Config {
@@ -25,15 +25,16 @@ fn gen_config() -> Config {
 async fn test_event_system_integration() {
     // Create event bus with receiver
     let (event_bus, mut receiver) = EventBus::new(100);
-    
+
     // Create core handle
     let handle = CoreHandle::new(event_bus, gen_config());
-    
+
     // Execute refresh containers command
-    handle.execute_command(CoreCommand::RefreshContainers)
+    handle
+        .execute_command(CoreCommand::RefreshContainers)
         .await
         .expect("Failed to execute refresh command");
-    
+
     // Verify event was received
     let event = receiver.recv().await.expect("Should receive event");
     match event {
@@ -43,7 +44,7 @@ async fn test_event_system_integration() {
         }
         _ => panic!("Expected ContainerListUpdate event"),
     }
-    
+
     // Verify state was updated
     let state = handle.state_view();
     // With real Docker integration, container count may vary
@@ -54,19 +55,28 @@ async fn test_event_system_integration() {
 async fn test_multiple_commands_and_events() {
     let (event_bus, mut receiver) = EventBus::new(100);
     let handle = CoreHandle::new(event_bus, gen_config());
-    
+
     // Execute multiple commands
-    handle.execute_command(CoreCommand::RefreshContainers).await.unwrap();
-    handle.execute_command(CoreCommand::RefreshStats("mock-container-1".to_string())).await.unwrap();
-    handle.execute_command(CoreCommand::RefreshLogs("mock-container-1".to_string())).await.unwrap();
-    
+    handle
+        .execute_command(CoreCommand::RefreshContainers)
+        .await
+        .unwrap();
+    handle
+        .execute_command(CoreCommand::RefreshStats("mock-container-1".to_string()))
+        .await
+        .unwrap();
+    handle
+        .execute_command(CoreCommand::RefreshLogs("mock-container-1".to_string()))
+        .await
+        .unwrap();
+
     // Verify all events in order
     let event1 = receiver.recv().await.unwrap();
     assert!(matches!(event1, CoreEvent::ContainerListUpdate(_)));
-    
+
     let event2 = receiver.recv().await.unwrap();
     assert!(matches!(event2, CoreEvent::ContainerStatsUpdate { .. }));
-    
+
     let event3 = receiver.recv().await.unwrap();
     assert!(matches!(event3, CoreEvent::ContainerLogsUpdate { .. }));
 }
@@ -77,12 +87,13 @@ async fn test_no_ui_dependencies() {
     // without any UI types being required
     let (event_bus, _receiver) = EventBus::new(10);
     let handle = CoreHandle::new(event_bus.clone(), gen_config());
-    
+
     // Basic operations should work without UI
     let _state = handle.state_view();
-    
+
     // Publishing events should work
-    event_bus.publish(CoreEvent::Error("Test error".to_string()))
+    event_bus
+        .publish(CoreEvent::Error("Test error".to_string()))
         .await
         .expect("Should publish event");
 }

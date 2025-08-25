@@ -9,9 +9,9 @@ use ratatui::{
     widgets::{Axis, Block, BorderType, Borders, Chart, Dataset, GraphType},
 };
 
-use crate::ui::FrameViewModel;
 use super::CONSTRAINT_50_50;
-use oxker_core::{ByteStats, CpuStats, State, Stats, AppColors};
+use crate::ui::FrameViewModel;
+use oxker_core::{AppColors, ByteStats, CpuStats, State, Stats};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ChartVariant {
@@ -83,20 +83,28 @@ fn make_chart<'a, T: Stats + Display>(
     let max_color = chart_variant.get_max_color(colors, state);
 
     Chart::new(dataset)
-        .bg(ratatui::style::Color::from(chart_variant.get_bg_color(colors)))
+        .bg(ratatui::style::Color::from(
+            chart_variant.get_bg_color(colors),
+        ))
         .block(
             Block::default()
-                .style(Style::default().bg(ratatui::style::Color::from(chart_variant.get_bg_color(colors))))
+                .style(Style::default().bg(ratatui::style::Color::from(
+                    chart_variant.get_bg_color(colors),
+                )))
                 .title_alignment(Alignment::Center)
                 .title(Span::styled(
                     format!(" {} {current} ", chart_variant.name()),
                     Style::default()
-                        .fg(ratatui::style::Color::from(chart_variant.get_title_color(colors, state)))
+                        .fg(ratatui::style::Color::from(
+                            chart_variant.get_title_color(colors, state),
+                        ))
                         .add_modifier(Modifier::BOLD),
                 ))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(ratatui::style::Color::from(chart_variant.get_border_color(colors)))),
+                .border_style(Style::default().fg(ratatui::style::Color::from(
+                    chart_variant.get_border_color(colors),
+                ))),
         )
         .x_axis(Axis::default().bounds([0.00, 60.0]))
         .y_axis(
@@ -108,7 +116,9 @@ fn make_chart<'a, T: Stats + Display>(
                         Style::default().add_modifier(Modifier::BOLD).fg(max_color),
                     ),
                 ])
-                .style(Style::new().fg(ratatui::style::Color::from(chart_variant.get_y_axis_color(colors))))
+                .style(Style::new().fg(ratatui::style::Color::from(
+                    chart_variant.get_y_axis_color(colors),
+                )))
                 // Add 0.01, so that max point is always visible?
                 .bounds([0.0, max.get_value() + 0.01]),
         )
@@ -170,11 +180,13 @@ mod tests {
     use insta::assert_snapshot;
     use ratatui::style::{Color, Modifier};
 
-    use oxker_core::{State, AppColors};
     use crate::{
         ui::FrameViewModel,
-        ui::draw_blocks::tests::{COLOR_ORANGE, get_result, insert_chart_data, test_setup, test_setup_with_state},
+        ui::draw_blocks::tests::{
+            COLOR_ORANGE, get_result, insert_chart_data, test_setup, test_setup_with_state,
+        },
     };
+    use oxker_core::{AppColors, State};
 
     /// CPU and Memory charts used in multiple tests, based on data from above insert_chart_data()
     const _EXPECTED: [&str; 10] = [

@@ -1,11 +1,11 @@
-use std::collections::{HashSet, VecDeque};
-use std::time::Instant;
-use oxker_core::{
-    AppColors, AppError, ByteStats, Columns, ContainerId, ContainerPorts, CpuStats, CpuTuple, 
-    DockerCommand, FilterBy, Header, MemTuple, SortedOrder, State, Stats,
-};
 use crate::handlers::UIContainerState;
 use crate::ui::gui_state::{DeleteButton, GuiState, SelectablePanel, Status};
+use oxker_core::{
+    AppColors, AppError, ByteStats, Columns, ContainerId, ContainerPorts, CpuStats, CpuTuple,
+    DockerCommand, FilterBy, Header, MemTuple, SortedOrder, State, Stats,
+};
+use std::collections::{HashSet, VecDeque};
+use std::time::Instant;
 
 /// Container view data for rendering
 #[derive(Debug, Clone)]
@@ -86,7 +86,8 @@ impl FrameViewModel {
         screen_width: u16,
     ) -> Self {
         // Convert containers to view models
-        let containers: Vec<ContainerView> = ui_state.get_container_items()
+        let containers: Vec<ContainerView> = ui_state
+            .get_container_items()
             .into_iter()
             .map(|c| ContainerView {
                 id: c.id.clone(),
@@ -104,29 +105,37 @@ impl FrameViewModel {
 
         // Get selected container for chart data and ports
         let selected_container = ui_state.containers.state.selected();
-        let selected_container_data = selected_container
-            .and_then(|idx| ui_state.containers.items.get(idx));
+        let selected_container_data =
+            selected_container.and_then(|idx| ui_state.containers.items.get(idx));
 
         // Prepare chart data if we have a selected container
         let chart_data = selected_container_data.map(|container| {
-            let cpu_data: Vec<(f64, f64)> = container.cpu_stats.iter()
+            let cpu_data: Vec<(f64, f64)> = container
+                .cpu_stats
+                .iter()
                 .enumerate()
                 .map(|(i, s)| (i as f64, s.get_value()))
                 .collect();
-            let mem_data: Vec<(f64, f64)> = container.mem_stats.iter()
+            let mem_data: Vec<(f64, f64)> = container
+                .mem_stats
+                .iter()
                 .enumerate()
                 .map(|(i, s)| (i as f64, s.get_value() as f64))
                 .collect();
-            
-            let max_cpu = container.cpu_stats.iter()
+
+            let max_cpu = container
+                .cpu_stats
+                .iter()
                 .max()
                 .copied()
                 .unwrap_or_default();
-            let max_mem = container.mem_stats.iter()
+            let max_mem = container
+                .mem_stats
+                .iter()
                 .max()
                 .copied()
                 .unwrap_or_default();
-            
+
             ChartData {
                 cpu_data: (cpu_data, max_cpu, container.state.clone()),
                 mem_data: (mem_data, max_mem, container.state.clone()),
@@ -177,10 +186,17 @@ impl FrameViewModel {
             chart_data,
             color_logs: true, // This should come from config
             columns,
-            container_title: create_container_title(ui_state.get_container_count(), ui_state.containers.state.selected()),
+            container_title: create_container_title(
+                ui_state.get_container_count(),
+                ui_state.containers.state.selected(),
+            ),
             delete_confirm: gui_state.get_delete_container(),
             filter_by: FilterBy::Name, // Convert from ui_state.filter_by
-            filter_term: if ui_state.filter_term.is_empty() { None } else { Some(ui_state.filter_term.clone()) },
+            filter_term: if ui_state.filter_term.is_empty() {
+                None
+            } else {
+                Some(ui_state.filter_term.clone())
+            },
             has_error: None, // Will need to get from somewhere
             info_text: gui_state.info_box_text.clone(),
             is_loading: gui_state.is_loading(),
@@ -191,9 +207,16 @@ impl FrameViewModel {
             port_view,
             commands_view,
             scroll_title,
-            sorted_by: ui_state.sort_header.as_ref().map(|header| 
-                (header.clone(), if ui_state.sort_ascending { SortedOrder::Asc } else { SortedOrder::Desc })
-            ),
+            sorted_by: ui_state.sort_header.as_ref().map(|header| {
+                (
+                    header.clone(),
+                    if ui_state.sort_ascending {
+                        SortedOrder::Asc
+                    } else {
+                        SortedOrder::Desc
+                    },
+                )
+            }),
             status: gui_state.get_status(),
         }
     }
@@ -201,19 +224,22 @@ impl FrameViewModel {
 
 /// Calculate maximum lengths for port display
 fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
-    let max_ip = ports.iter()
+    let max_ip = ports
+        .iter()
         .map(|p| p.ip.map(|ip| ip.to_string().len()).unwrap_or(0))
         .max()
         .unwrap_or(0);
-    let max_private = ports.iter()
+    let max_private = ports
+        .iter()
         .map(|p| p.private.to_string().len())
         .max()
         .unwrap_or(0);
-    let max_public = ports.iter()
+    let max_public = ports
+        .iter()
         .map(|p| p.public.as_ref().map(|p| p.to_string().len()).unwrap_or(0))
         .max()
         .unwrap_or(0);
-    
+
     (max_ip, max_private, max_public)
 }
 
@@ -224,27 +250,27 @@ fn calculate_columns(containers: &[ContainerView], screen_width: u16) -> Columns
     let mut state_width = 5; // min "State"
     let mut status_width = 6; // min "Status"
     let mut image_width = 5; // min "Image"
-    
+
     for container in containers {
         name_width = name_width.max(container.name.len());
         state_width = state_width.max(container.state.to_string().len());
         status_width = status_width.max(container.status.len());
         image_width = image_width.max(container.image.len());
     }
-    
+
     // Add some padding
     name_width = (name_width + 2).min(30);
     state_width = (state_width + 2).min(12);
     status_width = (status_width + 2).min(30);
     image_width = (image_width + 2).min(40);
-    
+
     // Fixed widths for numeric columns
     let cpu_width = 8; // "100.00%"
     let mem_current_width = 10; // "999.99 MB"
     let mem_limit_width = 10; // "999.99 GB"
     let id_width = 8; // 8 chars of ID
     let net_width = 10; // "999.99 MB"
-    
+
     Columns {
         name: (Header::Name, name_width as u8),
         state: (Header::State, state_width as u8),

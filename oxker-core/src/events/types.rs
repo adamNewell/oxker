@@ -37,14 +37,20 @@ pub struct LogLine {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CoreEvent {
     ContainerListUpdate(Vec<ContainerItem>),
-    ContainerListUpdated, // Simple notification that list changed
+    ContainerListUpdated,      // Simple notification that list changed
     ContainerSelectionChanged, // When selected container changes
-    ContainerStatsUpdate { container_id: String, stats: Stats },
-    ContainerLogsUpdate { container_id: String, logs: Vec<LogLine> },
+    ContainerStatsUpdate {
+        container_id: String,
+        stats: Stats,
+    },
+    ContainerLogsUpdate {
+        container_id: String,
+        logs: Vec<LogLine>,
+    },
     ContainerRemoved(String),
     Error(String),
-    LoadingStarted(String), // UUID as string
-    LoadingFinished(String), // UUID as string
+    LoadingStarted(String),           // UUID as string
+    LoadingFinished(String),          // UUID as string
     ContainerDeletionStarted(String), // Container ID
 }
 
@@ -53,7 +59,10 @@ pub enum CoreCommand {
     RefreshContainers,
     RefreshStats(String),
     RefreshLogs(String),
-    ExecuteCommand { container_id: String, command: Vec<String> },
+    ExecuteCommand {
+        container_id: String,
+        command: Vec<String>,
+    },
     RemoveContainer(String),
     StartContainer(String),
     StopContainer(String),

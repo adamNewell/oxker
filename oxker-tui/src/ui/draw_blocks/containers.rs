@@ -10,9 +10,9 @@ use ratatui::{
     widgets::{List, ListItem, ListState as RatatuiListState, Paragraph},
 };
 
-use oxker_core::{ByteStats, Columns, CpuStats, AppColors};
-use crate::ui::{FrameViewModel, GuiState, SelectablePanel, ContainerView};
 use crate::handlers::UIContainerState;
+use crate::ui::{ContainerView, FrameViewModel, GuiState, SelectablePanel};
+use oxker_core::{AppColors, ByteStats, Columns, CpuStats};
 
 use super::{CIRCLE, generate_block};
 
@@ -22,11 +22,7 @@ fn format_containers<'a>(colors: AppColors, i: &ContainerView, widths: &Columns)
 
     Line::from(vec![
         Span::styled(
-            format!(
-                "{:<width$}{MARGIN}",
-                i.name,
-                width = widths.name.1.into()
-            ),
+            format!("{:<width$}{MARGIN}", i.name, width = widths.name.1.into()),
             Style::default().fg(colors.containers.text),
         ),
         Span::styled(
@@ -72,11 +68,7 @@ fn format_containers<'a>(colors: AppColors, i: &ContainerView, widths: &Columns)
             Style::default().fg(colors.containers.text),
         ),
         Span::styled(
-            format!(
-                "{:<width$}{MARGIN}",
-                i.image,
-                width = widths.image.1.into()
-            ),
+            format!("{:<width$}{MARGIN}", i.image, width = widths.image.1.into()),
             Style::default().fg(colors.containers.text),
         ),
         Span::styled(
@@ -102,7 +94,8 @@ pub fn draw(
     let block = generate_block(area, colors, fd, gui_state, SelectablePanel::Containers)
         .bg(colors.containers.background);
 
-    let items = fd.containers
+    let items = fd
+        .containers
         .iter()
         .map(|i| ListItem::new(format_containers(colors, i, &fd.columns)))
         .collect::<Vec<_>>();
@@ -137,47 +130,51 @@ pub fn draw(
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
-    use insta::assert_snapshot;
-    use crate::test_utils::test_utils::*;
-    use oxker_core::{State, RunningState};
-    use crate::ui::{FrameViewModel, GuiState};
     use super::draw;
+    use crate::test_utils::test_utils::*;
+    use crate::ui::{FrameViewModel, GuiState};
+    use insta::assert_snapshot;
+    use oxker_core::{RunningState, State};
 
     #[test]
     fn test_containers_list_display() {
-        let setup = TestSetup::new(100, 20, true)
-            .with_containers(vec![
-                TestContainerBuilder::new("container1")
-                    .with_name("test-container-1")
-                    .with_image("nginx:latest")
-                    .with_state(State::Running(RunningState::Healthy))
-                    .with_cpu_stats(vec![5.5])
-                    .with_memory_stats(vec![100 * 1024 * 1024]) // 100MB
-                    .build(),
-                TestContainerBuilder::new("container2")
-                    .with_name("test-container-2")
-                    .with_image("postgres:13")
-                    .with_state(State::Paused)
-                    .build(),
-            ]);
+        let setup = TestSetup::new(100, 20, true).with_containers(vec![
+            TestContainerBuilder::new("container1")
+                .with_name("test-container-1")
+                .with_image("nginx:latest")
+                .with_state(State::Running(RunningState::Healthy))
+                .with_cpu_stats(vec![5.5])
+                .with_memory_stats(vec![100 * 1024 * 1024]) // 100MB
+                .build(),
+            TestContainerBuilder::new("container2")
+                .with_name("test-container-2")
+                .with_image("postgres:13")
+                .with_state(State::Paused)
+                .build(),
+        ]);
 
         let mut terminal = setup.terminal;
         let config = crate::test_utils::test_utils::gen_config();
         let colors = config.app_colors;
         let fd = create_test_frame_view_model(&setup.gui_state, &setup.container_state, &config);
-        
-        terminal.draw(|f| {
-            draw(
-                &setup.container_state,
-                f.area(),
-                colors,
-                f,
-                &fd,
-                &setup.gui_state,
-            );
-        }).unwrap();
 
-        let buffer_content = terminal.buffer().content.iter()
+        terminal
+            .draw(|f| {
+                draw(
+                    &setup.container_state,
+                    f.area(),
+                    colors,
+                    f,
+                    &fd,
+                    &setup.gui_state,
+                );
+            })
+            .unwrap();
+
+        let buffer_content = terminal
+            .buffer()
+            .content
+            .iter()
             .map(|cell| cell.symbol().to_string())
             .collect::<Vec<_>>()
             .chunks(100) // width
@@ -190,41 +187,45 @@ mod tests {
     #[test]
     fn test_containers_empty_state() {
         let setup = TestSetup::new(100, 20, true);
-        
+
         let mut terminal = setup.terminal;
         let config = crate::test_utils::test_utils::gen_config();
         let colors = config.app_colors;
         let fd = create_test_frame_view_model(&setup.gui_state, &setup.container_state, &config);
-        
-        terminal.draw(|f| {
-            draw(
-                &setup.container_state,
-                f.area(),
-                colors,
-                f,
-                &fd,
-                &setup.gui_state,
-            );
-        }).unwrap();
 
-        let buffer_text = terminal.buffer().content.iter()
+        terminal
+            .draw(|f| {
+                draw(
+                    &setup.container_state,
+                    f.area(),
+                    colors,
+                    f,
+                    &fd,
+                    &setup.gui_state,
+                );
+            })
+            .unwrap();
+
+        let buffer_text = terminal
+            .buffer()
+            .content
+            .iter()
             .map(|cell| cell.symbol())
             .collect::<String>();
-        
+
         assert!(buffer_text.contains("no containers running"));
     }
 
     #[test]
     fn test_containers_with_filter() {
-        let setup = TestSetup::new(100, 20, true)
-            .with_containers(vec![
-                TestContainerBuilder::new("container1")
-                    .with_name("nginx-prod")
-                    .build(),
-                TestContainerBuilder::new("container2")
-                    .with_name("postgres-prod")
-                    .build(),
-            ]);
+        let setup = TestSetup::new(100, 20, true).with_containers(vec![
+            TestContainerBuilder::new("container1")
+                .with_name("nginx-prod")
+                .build(),
+            TestContainerBuilder::new("container2")
+                .with_name("postgres-prod")
+                .build(),
+        ]);
 
         // Apply filter
         // Note: In the new architecture, filtering would be done through
@@ -234,19 +235,24 @@ mod tests {
         let config = crate::test_utils::test_utils::gen_config();
         let colors = config.app_colors;
         let fd = create_test_frame_view_model(&setup.gui_state, &setup.container_state, &config);
-        
-        terminal.draw(|f| {
-            draw(
-                &setup.container_state,
-                f.area(),
-                colors,
-                f,
-                &fd,
-                &setup.gui_state,
-            );
-        }).unwrap();
 
-        let buffer_content = terminal.buffer().content.iter()
+        terminal
+            .draw(|f| {
+                draw(
+                    &setup.container_state,
+                    f.area(),
+                    colors,
+                    f,
+                    &fd,
+                    &setup.gui_state,
+                );
+            })
+            .unwrap();
+
+        let buffer_content = terminal
+            .buffer()
+            .content
+            .iter()
             .map(|cell| cell.symbol().to_string())
             .collect::<Vec<_>>()
             .chunks(100) // width
@@ -259,30 +265,35 @@ mod tests {
     #[test]
     fn test_containers_loading_state() {
         let setup = TestSetup::new(100, 20, true);
-        
+
         // Set loading state
         GuiState::start_loading_animation(&setup.gui_state, uuid::Uuid::new_v4());
-        
+
         let mut terminal = setup.terminal;
         let config = crate::test_utils::test_utils::gen_config();
         let colors = config.app_colors;
         let fd = create_test_frame_view_model(&setup.gui_state, &setup.container_state, &config);
-        
-        terminal.draw(|f| {
-            draw(
-                &setup.container_state,
-                f.area(),
-                colors,
-                f,
-                &fd,
-                &setup.gui_state,
-            );
-        }).unwrap();
 
-        let buffer_text = terminal.buffer().content.iter()
+        terminal
+            .draw(|f| {
+                draw(
+                    &setup.container_state,
+                    f.area(),
+                    colors,
+                    f,
+                    &fd,
+                    &setup.gui_state,
+                );
+            })
+            .unwrap();
+
+        let buffer_text = terminal
+            .buffer()
+            .content
+            .iter()
             .map(|cell| cell.symbol())
             .collect::<String>();
-        
+
         assert!(buffer_text.contains("loading"));
     }
 }

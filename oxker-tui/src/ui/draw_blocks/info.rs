@@ -8,9 +8,9 @@ use ratatui::{
     widgets::{Block, Borders, Clear, Paragraph},
 };
 
-use oxker_core::AppColors;
-use crate::ui::{GuiState, gui_state::BoxLocation};
 use super::{max_line_width, popup};
+use crate::ui::{GuiState, gui_state::BoxLocation};
+use oxker_core::AppColors;
 
 /// Draw info box in one of the 9 BoxLocations
 // TODO is this broken - I don't think so
@@ -57,8 +57,8 @@ mod tests {
     use insta::assert_snapshot;
     use ratatui::style::Color;
 
+    use crate::ui::{GuiState, gui_state::BoxLocation};
     use oxker_core::AppColors;
-use crate::ui::{GuiState, gui_state::BoxLocation};
     // Placeholder test
     #[test]
     fn test_placeholder() {

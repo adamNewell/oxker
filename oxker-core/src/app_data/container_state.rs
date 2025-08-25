@@ -19,11 +19,11 @@ impl ListState {
     pub fn selected(&self) -> Option<usize> {
         self.selected
     }
-    
+
     pub fn select(&mut self, index: Option<usize>) {
         self.selected = index;
     }
-    
+
     pub fn offset(&self) -> usize {
         // For now, always return 0 as we don't have viewport scrolling implemented
         0
@@ -310,7 +310,7 @@ impl State {
             _ => false,
         }
     }
-    
+
     /// Get raw state string for API/event communication
     pub const fn as_str(&self) -> &'static str {
         match self {
@@ -323,7 +323,7 @@ impl State {
             Self::Unknown => "unknown",
         }
     }
-    
+
     /// Color of the state for the containers section
     pub const fn get_color(self, colors: AppColors) -> Color {
         match self {
@@ -950,11 +950,9 @@ mod tests {
 
     use jiff::tz::TimeZone;
 
-    use crate::{
-        app_data::{ContainerImage, Logs, LogsTz, RunningState},
-    };
+    use crate::app_data::{ContainerImage, Logs, LogsTz, RunningState};
 
-    use super::{ByteStats, ContainerName, ContainerStatus, CpuStats, State, Size};
+    use super::{ByteStats, ContainerName, ContainerStatus, CpuStats, Size, State};
 
     #[test]
     /// Display CpuStats as a string

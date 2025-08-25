@@ -22,7 +22,7 @@ impl GuiState {
     }
 }
 
-/// Stub for UI Rerender 
+/// Stub for UI Rerender
 pub struct Rerender {
     should_redraw: AtomicBool,
 }
@@ -44,4 +44,3 @@ impl Default for Rerender {
         Self::new()
     }
 }
-

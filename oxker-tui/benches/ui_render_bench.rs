@@ -1,14 +1,14 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use oxker_core::{
-    AppColors, ByteStats, ContainerItem, ContainerId, CpuStats, DockerCommand,
-    RunningState, State, StatefulList,
+    AppColors, ByteStats, ContainerId, ContainerItem, CpuStats, DockerCommand, RunningState, State,
+    StatefulList,
 };
-use oxker_tui::ui::view_models::FrameViewModel;
-use oxker_tui::ui::gui_state::{GuiState, SelectablePanel};
 use oxker_tui::handlers::UIContainerState;
+use oxker_tui::ui::gui_state::{GuiState, SelectablePanel};
+use oxker_tui::ui::view_models::FrameViewModel;
 use parking_lot::Mutex;
-use std::sync::Arc;
 use std::collections::VecDeque;
+use std::sync::Arc;
 
 fn create_test_container(index: u64, name: &str) -> ContainerItem {
     let mut container = ContainerItem::new(
@@ -21,42 +21,48 @@ fn create_test_container(index: u64, name: &str) -> ContainerItem {
         State::Running(RunningState::Healthy),
         oxker_core::ContainerStatus::from("Up 2 hours"),
     );
-    
+
     // Add some CPU stats
     for i in 0..60 {
-        container.cpu_stats.push_front(CpuStats::new(10.0 + (i as f64 * 0.5)));
+        container
+            .cpu_stats
+            .push_front(CpuStats::new(10.0 + (i as f64 * 0.5)));
     }
-    
+
     // Add some memory stats
     for i in 0..60 {
-        container.mem_stats.push_front(ByteStats::new(1024 * 1024 * (100 + i)));
+        container
+            .mem_stats
+            .push_front(ByteStats::new(1024 * 1024 * (100 + i)));
     }
-    
+
     container.mem_limit = ByteStats::new(1024 * 1024 * 1024); // 1GB
     container.rx = ByteStats::new(1024 * 1024);
     container.tx = ByteStats::new(1024 * 512);
-    
+
     container
 }
 
 fn create_ui_state_with_containers(num_containers: usize) -> Arc<Mutex<UIContainerState>> {
     let ui_state = Arc::new(Mutex::new(UIContainerState::new()));
-    
+
     let containers: Vec<ContainerItem> = (0..num_containers)
         .map(|i| create_test_container(i as u64, &format!("container_{}", i)))
         .collect();
-    
+
     {
         let mut state = ui_state.lock();
         state.containers = StatefulList::new(containers);
         state.containers.state.select(Some(0)); // Select first container
-        
+
         // Add some logs
         for i in 0..100 {
-            state.logs.push_back(format!("Log line {} with some content", i));
+            state
+                .logs
+                .push_back(format!("Log line {} with some content", i));
         }
     }
-    
+
     ui_state
 }
 
@@ -67,7 +73,7 @@ fn create_gui_state() -> Arc<Mutex<GuiState>> {
 
 fn benchmark_frame_view_model_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("FrameViewModel Creation");
-    
+
     for num_containers in [1, 10, 50, 100].iter() {
         group.bench_with_input(
             BenchmarkId::from_parameter(num_containers),
@@ -76,11 +82,11 @@ fn benchmark_frame_view_model_creation(c: &mut Criterion) {
                 let ui_state = create_ui_state_with_containers(num_containers);
                 let gui_state = create_gui_state();
                 let colors = AppColors::default();
-                
+
                 b.iter(|| {
                     let ui_state_lock = ui_state.lock();
                     let gui_state_lock = gui_state.lock();
-                    
+
                     black_box(FrameViewModel::from_state(
                         &*ui_state_lock,
                         &*gui_state_lock,
@@ -91,20 +97,20 @@ fn benchmark_frame_view_model_creation(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
 fn benchmark_container_update(c: &mut Criterion) {
     let mut group = c.benchmark_group("Container Update");
-    
+
     for num_containers in [10, 50, 100].iter() {
         group.bench_with_input(
             BenchmarkId::from_parameter(num_containers),
             num_containers,
             |b, &num_containers| {
                 let ui_state = create_ui_state_with_containers(0);
-                
+
                 // Create event containers
                 let event_containers: Vec<_> = (0..num_containers)
                     .map(|i| oxker_core::events::types::ContainerItem {
@@ -115,7 +121,7 @@ fn benchmark_container_update(c: &mut Criterion) {
                         status: "Up 2 hours".to_string(),
                     })
                     .collect();
-                
+
                 b.iter(|| {
                     let mut state = ui_state.lock();
                     state.update_containers(black_box(event_containers.clone()));
@@ -123,7 +129,7 @@ fn benchmark_container_update(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -131,7 +137,7 @@ fn benchmark_lock_contention(c: &mut Criterion) {
     let ui_state = create_ui_state_with_containers(50);
     let gui_state = create_gui_state();
     let colors = AppColors::default();
-    
+
     c.bench_function("concurrent_access", |b| {
         b.iter(|| {
             // Simulate concurrent access from multiple threads
@@ -139,7 +145,7 @@ fn benchmark_lock_contention(c: &mut Criterion) {
                 .map(|i| {
                     let ui_state = ui_state.clone();
                     let gui_state = gui_state.clone();
-                    
+
                     std::thread::spawn(move || {
                         for _ in 0..10 {
                             if i % 2 == 0 {
@@ -147,10 +153,7 @@ fn benchmark_lock_contention(c: &mut Criterion) {
                                 let ui_lock = ui_state.lock();
                                 let gui_lock = gui_state.lock();
                                 let _ = black_box(FrameViewModel::from_state(
-                                    &*ui_lock,
-                                    &*gui_lock,
-                                    colors,
-                                    200,
+                                    &*ui_lock, &*gui_lock, colors, 200,
                                 ));
                             } else {
                                 // Writer thread
@@ -161,7 +164,7 @@ fn benchmark_lock_contention(c: &mut Criterion) {
                     })
                 })
                 .collect();
-            
+
             for handle in handles {
                 handle.join().unwrap();
             }

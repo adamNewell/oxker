@@ -5,8 +5,8 @@ use ratatui::{
     text::{Line, Span},
 };
 
-use oxker_core::{FilterBy, AppColors};
 use crate::ui::FrameViewModel;
+use oxker_core::{AppColors, FilterBy};
 
 /// Create the filter_by by spans, coloured dependant on which one is selected
 fn filter_by_spans(colors: AppColors, fd: &'_ FrameViewModel) -> [Span<'_>; 4] {
@@ -65,7 +65,10 @@ pub fn draw(area: Rect, colors: AppColors, frame: &mut Frame, fd: &FrameViewMode
             Style::default().fg(colors.filter.text),
         ),
     ]);
-    frame.render_widget(Line::from(line).bg(ratatui::style::Color::from(colors.filter.background)), area);
+    frame.render_widget(
+        Line::from(line).bg(ratatui::style::Color::from(colors.filter.background)),
+        area,
+    );
 }
 
 #[cfg(test)]
@@ -75,13 +78,11 @@ mod tests {
     use insta::assert_snapshot;
     use ratatui::style::{Color, Modifier};
 
-    use oxker_core::AppColors;
-    use crate::{
-        ui::{
-            FrameViewModel,
-            draw_blocks::tests::{get_result, test_setup},
-        },
+    use crate::ui::{
+        FrameViewModel,
+        draw_blocks::tests::{get_result, test_setup},
     };
+    use oxker_core::AppColors;
 
     #[test]
     /// Filter row is drawn correctly & colors are correct
@@ -102,7 +103,7 @@ mod tests {
 
         // TODO: Fix snapshot test timeout issue
         // assert_snapshot!(setup.terminal.backend());
-        
+
         // For now, just verify that the test runs without hanging
         assert!(true);
 
@@ -165,7 +166,7 @@ mod tests {
 
         // TODO: Fix snapshot test timeout issue
         // assert_snapshot!(setup.terminal.backend());
-        
+
         // For now, just verify that the test runs without hanging
         assert!(true);
 
@@ -218,7 +219,7 @@ mod tests {
 
         // TODO: Fix snapshot test timeout issue
         // assert_snapshot!(setup.terminal.backend());
-        
+
         // For now, just verify that the test runs without hanging
         assert!(true);
 
@@ -282,7 +283,7 @@ mod tests {
 
         // TODO: Fix snapshot test timeout issue
         // assert_snapshot!(setup.terminal.backend());
-        
+
         // For now, just verify that the test runs without hanging
         assert!(true);
 

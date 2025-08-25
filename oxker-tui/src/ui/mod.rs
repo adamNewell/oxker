@@ -25,17 +25,14 @@ mod gui_state;
 mod redraw;
 mod view_models;
 pub use redraw::Rerender;
-pub use view_models::{FrameViewModel, ContainerView, ChartData, PortView, LogView, CommandsView};
+pub use view_models::{ChartData, CommandsView, ContainerView, FrameViewModel, LogView, PortView};
 
 pub use self::gui_state::{DeleteButton, GuiState, SelectablePanel, Status};
-use crate::input_handler::InputMessages;
 use crate::handlers::UIContainerState;
+use crate::input_handler::InputMessages;
 use oxker_core::{
-    AppData, AppError,
-    AppColors, Keymap,
-    ContainerId, State, Header,
-    Columns, ContainerPorts, CpuTuple, FilterBy, MemTuple, SortedOrder,
-    TerminalSize, Config,
+    AppColors, AppData, AppError, Columns, Config, ContainerId, ContainerPorts, CpuTuple, FilterBy,
+    Header, Keymap, MemTuple, SortedOrder, State, TerminalSize,
 };
 
 const POLL_RATE: Duration = std::time::Duration::from_millis(50);
@@ -228,13 +225,13 @@ impl Ui {
             // }
             if self.should_redraw(&mut drawn_at, docker_interval_ms) {
                 let screen_width = self.gui_state.lock().get_screen_width();
-                
+
                 // Check if we need to recreate the view model
                 let needs_update = {
                     let ui_state = self.container_state.lock();
                     self.cached_view_model.is_none() || ui_state.has_significant_changes()
                 };
-                
+
                 if needs_update {
                     let mut ui_state = self.container_state.lock();
                     self.cached_view_model = Some(FrameViewModel::from_state(
@@ -245,16 +242,24 @@ impl Ui {
                     ));
                     ui_state.mark_changes_rendered();
                 }
-                
+
                 if let Some(fd) = &self.cached_view_model {
                     let exec = fd.status.contains(&Status::Exec);
-                    
+
                     if exec {
                         self.exec().await;
                     } else if self
                         .terminal
                         .draw(|frame| {
-                            draw_frame(&self.container_state, &self.config, colors, &keymap, frame, fd, &self.gui_state);
+                            draw_frame(
+                                &self.container_state,
+                                &self.config,
+                                colors,
+                                &keymap,
+                                frame,
+                                fd,
+                                &self.gui_state,
+                            );
                         })
                         .is_err()
                     {
@@ -310,7 +315,6 @@ impl Ui {
     }
 }
 
-
 /// Draw the main ui to a frame of the terminal
 fn draw_frame(
     container_state: &Arc<Mutex<UIContainerState>>,
@@ -365,7 +369,14 @@ fn draw_frame(
         })
         .split(containers_logs_section[0]);
 
-    draw_blocks::containers::draw(container_state, containers_commands[0], colors, f, fd, gui_state);
+    draw_blocks::containers::draw(
+        container_state,
+        containers_commands[0],
+        colors,
+        f,
+        fd,
+        gui_state,
+    );
 
     if fd.show_logs {
         draw_blocks::logs::draw(
@@ -380,12 +391,13 @@ fn draw_frame(
 
     if let Some(id) = fd.delete_confirm.as_ref() {
         // Find container name from UIContainerState
-        let container_name = container_state.lock()
+        let container_name = container_state
+            .lock()
             .get_container_items()
             .iter()
             .find(|c| &c.id == id)
             .map(|c| c.name.clone());
-            
+
         if let Some(name) = container_name {
             draw_blocks::delete_confirm::draw(colors, f, gui_state, keymap, &name);
         } else {
@@ -405,7 +417,7 @@ fn draw_frame(
             // ip_width + 3 + 7 + 2 + 7 + 2 borders
             u16::try_from(ip_width + 3 + 7 + 2 + 7 + 2).unwrap_or(37)
         } else {
-            23  // Minimum width: 2 + 3 + 7 + 2 + 7 + 2 = 23
+            23 // Minimum width: 2 + 3 + 7 + 2 + 7 + 2 = 23
         };
 
         let lower = Layout::default()
@@ -424,13 +436,7 @@ fn draw_frame(
     // Check if error, and show popup if so
     if fd.status.contains(&Status::Help) {
         let tz = config.timezone.clone();
-        draw_blocks::help::draw(
-            colors,
-            f,
-            keymap,
-            config.show_timestamp,
-            tz.as_ref(),
-        );
+        draw_blocks::help::draw(colors, f, keymap, config.show_timestamp, tz.as_ref());
     }
 
     if let Some(error) = fd.has_error.as_ref() {

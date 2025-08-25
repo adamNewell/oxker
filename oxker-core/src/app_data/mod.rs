@@ -13,7 +13,10 @@ use crate::{
     ENTRY_POINT,
     app_error::AppError,
     config::Config,
-    events::{EventBus, CoreEvent, types::{ContainerItem as EventContainerItem, ContainerPort as EventContainerPort}},
+    events::{
+        CoreEvent, EventBus,
+        types::{ContainerItem as EventContainerItem, ContainerPort as EventContainerPort},
+    },
 };
 pub use container_state::*;
 
@@ -157,22 +160,33 @@ impl AppData {
 
     /// Helper to emit container list update events
     async fn emit_container_update(&self) {
-        let containers: Vec<EventContainerItem> = self.containers.items.iter().map(|c| {
-            EventContainerItem {
+        let containers: Vec<EventContainerItem> = self
+            .containers
+            .items
+            .iter()
+            .map(|c| EventContainerItem {
                 id: c.id.get().to_string(),
                 name: c.name.get().to_string(),
                 image: c.image.to_string(),
                 state: c.state.as_str().to_string(),
                 status: c.status.to_string(),
-                ports: c.ports.iter().map(|p| EventContainerPort {
-                    ip: p.ip.map(|ip| ip.to_string()),
-                    private: p.private,
-                    public: p.public,
-                }).collect(),
-            }
-        }).collect();
-        
-        if let Err(e) = self.event_bus.publish(CoreEvent::ContainerListUpdate(containers)).await {
+                ports: c
+                    .ports
+                    .iter()
+                    .map(|p| EventContainerPort {
+                        ip: p.ip.map(|ip| ip.to_string()),
+                        private: p.private,
+                        public: p.public,
+                    })
+                    .collect(),
+            })
+            .collect();
+
+        if let Err(e) = self
+            .event_bus
+            .publish(CoreEvent::ContainerListUpdate(containers))
+            .await
+        {
             eprintln!("Failed to publish container update event: {}", e);
         }
     }
@@ -243,7 +257,7 @@ impl AppData {
         if self.get_container_len() != pre_len {
             self.containers.start();
         }
-        
+
         // Emit container list update event
         #[cfg(not(test))]
         {
@@ -359,7 +373,7 @@ impl AppData {
     /// If not sort set, then sort by created time
     pub fn sort_containers(&mut self) {
         let pre_order = self.get_current_ids();
-        
+
         if let Some((head, ord)) = self.sorted_by {
             let sort_closure = |a: &ContainerItem, b: &ContainerItem| -> std::cmp::Ordering {
                 let item_ord = match ord {
@@ -430,7 +444,7 @@ impl AppData {
             });
             self.current_sorted_id = self.get_current_ids();
         }
-        
+
         // Emit event if order changed
         #[cfg(not(test))]
         if pre_order != self.get_current_ids() {
@@ -479,7 +493,9 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus.publish(CoreEvent::ContainerSelectionChanged).await;
+                event_bus
+                    .publish(CoreEvent::ContainerSelectionChanged)
+                    .await;
             });
         }
     }
@@ -491,7 +507,9 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus.publish(CoreEvent::ContainerSelectionChanged).await;
+                event_bus
+                    .publish(CoreEvent::ContainerSelectionChanged)
+                    .await;
             });
         }
     }
@@ -503,7 +521,9 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus.publish(CoreEvent::ContainerSelectionChanged).await;
+                event_bus
+                    .publish(CoreEvent::ContainerSelectionChanged)
+                    .await;
             });
         }
     }
@@ -515,7 +535,9 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus.publish(CoreEvent::ContainerSelectionChanged).await;
+                event_bus
+                    .publish(CoreEvent::ContainerSelectionChanged)
+                    .await;
             });
         }
     }
@@ -1009,28 +1031,38 @@ impl AppData {
             }
             // self.redraw.set_true("update_containers");
         }
-        
+
         // Publish ContainerListUpdate event with current container data
         #[cfg(not(test))]
         {
-            let containers: Vec<crate::events::types::ContainerItem> = self.containers.items.iter().map(|c| {
-                crate::events::types::ContainerItem {
+            let containers: Vec<crate::events::types::ContainerItem> = self
+                .containers
+                .items
+                .iter()
+                .map(|c| crate::events::types::ContainerItem {
                     id: c.id.get().to_string(),
                     name: c.name.get().to_string(),
                     image: c.image.get().to_string(),
                     state: c.state.as_str().to_string(),
                     status: c.status.to_string(),
-                    ports: c.ports.iter().map(|p| crate::events::types::ContainerPort {
-                        ip: p.ip.map(|ip| ip.to_string()),
-                        private: p.private,
-                        public: p.public,
-                    }).collect(),
-                }
-            }).collect();
-            
+                    ports: c
+                        .ports
+                        .iter()
+                        .map(|p| crate::events::types::ContainerPort {
+                            ip: p.ip.map(|ip| ip.to_string()),
+                            private: p.private,
+                            public: p.public,
+                        })
+                        .collect(),
+                })
+                .collect();
+
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                if let Err(e) = event_bus.publish(CoreEvent::ContainerListUpdate(containers)).await {
+                if let Err(e) = event_bus
+                    .publish(CoreEvent::ContainerListUpdate(containers))
+                    .await
+                {
                     eprintln!("Failed to publish container update event: {}", e);
                 }
             });
@@ -1087,7 +1119,9 @@ impl AppData {
 mod tests {
 
     use super::*;
-    use crate::tests::{gen_appdata_with_containers as gen_appdata, gen_container_summary, gen_containers};
+    use crate::tests::{
+        gen_appdata_with_containers as gen_appdata, gen_container_summary, gen_containers,
+    };
     use std::collections::VecDeque;
 
     // ******* //

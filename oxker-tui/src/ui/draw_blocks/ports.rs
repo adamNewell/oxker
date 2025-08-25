@@ -6,8 +6,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph},
 };
 
-use oxker_core::{State, AppColors};
 use crate::ui::FrameViewModel;
+use oxker_core::{AppColors, State};
 
 /// Get the port title color, at the moment the color is only customizable if the container is alive
 const fn get_port_title_color(colors: AppColors, state: State) -> Color {
@@ -38,7 +38,7 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameViewModel) {
         let (ip_len, _, _) = port_view.max_lens;
         let ip_width = ip_len.max(2).min(16); // Min 2 (for "ip" header), max 16 characters
         let private_width = 7; // Always 7 text columns for private
-        let public_width = 7;  // Always 7 text columns for public
+        let public_width = 7; // Always 7 text columns for public
 
         if port_view.ports.is_empty() {
             let text = match port_view.state {
@@ -52,21 +52,25 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameViewModel) {
             f.render_widget(paragraph, area);
         } else {
             let mut output = vec![];
-            
+
             // Header line: IP + 3 spaces + Private(7) + 3 spaces + Public(7)
             let header_line = format!(
                 "{:>ip_width$}   {:>private_width$}  {:>public_width$}",
                 "ip", "private", "public"
             );
-            output.push(Line::from(Span::from(header_line).fg(colors.chart_ports.headings)));
-            
+            output.push(Line::from(
+                Span::from(header_line).fg(colors.chart_ports.headings),
+            ));
+
             for item in &port_view.ports {
                 let strings = item.get_all();
                 let data_line = format!(
                     "{:>ip_width$}   {:>private_width$}  {:>public_width$}",
                     strings.0, strings.1, strings.2
                 );
-                output.push(Line::from(Span::from(data_line).fg(colors.chart_ports.text)));
+                output.push(Line::from(
+                    Span::from(data_line).fg(colors.chart_ports.text),
+                ));
             }
             let paragraph = Paragraph::new(output)
                 .block(block)
@@ -84,13 +88,14 @@ mod tests {
     use insta::assert_snapshot;
     use ratatui::style::{Color, Modifier};
 
-    use oxker_core::{ContainerPorts, RunningState, State, AppColors};
-    use crate::{
-        ui::{
-            FrameViewModel,
-            draw_blocks::tests::{COLOR_ORANGE, COLOR_RX, COLOR_TX, get_result, test_setup, test_setup_no_ports, test_setup_custom, test_setup_multiple_ports},
+    use crate::ui::{
+        FrameViewModel,
+        draw_blocks::tests::{
+            COLOR_ORANGE, COLOR_RX, COLOR_TX, get_result, test_setup, test_setup_custom,
+            test_setup_multiple_ports, test_setup_no_ports,
         },
     };
+    use oxker_core::{AppColors, ContainerPorts, RunningState, State};
 
     #[test]
     /// Port section when container has no ports

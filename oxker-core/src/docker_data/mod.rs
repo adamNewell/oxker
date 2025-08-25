@@ -24,7 +24,10 @@ use crate::{
     app_data::{AppData, ContainerId, DockerCommand, State},
     app_error::AppError,
     config::Config,
-    events::{EventBus, types::{CoreEvent, Stats, LogLine}},
+    events::{
+        EventBus,
+        types::{CoreEvent, LogLine, Stats},
+    },
 };
 mod message;
 pub use message::DockerMessage;
@@ -149,10 +152,12 @@ impl DockerData {
         while let Some(Ok(stats)) = stream.next().await {
             // Memory stats are only collected if the container is alive - is this the behaviour we want?
 
-            let mem_limit = stats.memory_stats.as_ref()
+            let mem_limit = stats
+                .memory_stats
+                .as_ref()
                 .and_then(|m| m.limit)
                 .unwrap_or_default();
-            
+
             let (mem_stat, cpu_stats) = if state.is_alive() {
                 let mem_cache = stats.memory_stats.as_ref().map_or(&0, |i| {
                     i.stats
@@ -183,28 +188,25 @@ impl DockerData {
                 })
             });
 
-            app_data.lock().update_stats_by_id(
-                id,
-                cpu_stats,
-                mem_stat,
-                mem_limit,
-                rx,
-                tx,
-            );
-            
+            app_data
+                .lock()
+                .update_stats_by_id(id, cpu_stats, mem_stat, mem_limit, rx, tx);
+
             // Publish stats update event
             if let (Some(cpu), Some(mem)) = (cpu_stats, mem_stat) {
-                let _ = event_bus.publish(CoreEvent::ContainerStatsUpdate {
-                    container_id: id.get().to_string(),
-                    stats: Stats {
+                let _ = event_bus
+                    .publish(CoreEvent::ContainerStatsUpdate {
                         container_id: id.get().to_string(),
-                        cpu_usage: cpu,
-                        memory_usage: mem,
-                        memory_limit: mem_limit,
-                        network_rx: rx,
-                        network_tx: tx,
-                    },
-                }).await;
+                        stats: Stats {
+                            container_id: id.get().to_string(),
+                            cpu_usage: cpu,
+                            memory_usage: mem,
+                            memory_limit: mem_limit,
+                            network_rx: rx,
+                            network_tx: tx,
+                        },
+                    })
+                    .await;
             }
         }
         spawns.lock().remove(&spawn_id);
@@ -294,22 +296,27 @@ impl DockerData {
                 output.push(data);
             }
         }
-        
+
         // Update internal state
         app_data.lock().update_log_by_id(output.clone(), &id);
-        
+
         // Always publish logs event, even if empty
-        let logs: Vec<LogLine> = output.into_iter().map(|msg| LogLine {
-            container_id: id.get().to_string(),
-            timestamp: String::new(), // Timestamp is embedded in message
-            message: msg,
-        }).collect();
-        
-        let _ = event_bus.publish(CoreEvent::ContainerLogsUpdate {
-            container_id: id.get().to_string(),
-            logs,
-        }).await;
-        
+        let logs: Vec<LogLine> = output
+            .into_iter()
+            .map(|msg| LogLine {
+                container_id: id.get().to_string(),
+                timestamp: String::new(), // Timestamp is embedded in message
+                message: msg,
+            })
+            .collect();
+
+        let _ = event_bus
+            .publish(CoreEvent::ContainerLogsUpdate {
+                container_id: id.get().to_string(),
+                logs,
+            })
+            .await;
+
         spawns.lock().remove(&SpawnId::Log(id));
     }
 
@@ -379,11 +386,7 @@ impl DockerData {
     }
 
     /// Set the global error as the docker error
-    fn set_error(
-        app_data: &Arc<Mutex<AppData>>,
-        error: DockerCommand,
-        _event_bus: &Arc<EventBus>,
-    ) {
+    fn set_error(app_data: &Arc<Mutex<AppData>>, error: DockerCommand, _event_bus: &Arc<EventBus>) {
         let error = AppError::DockerCommand(error);
         app_data.lock().set_error(error);
         // TODO: Emit error event
@@ -457,19 +460,21 @@ impl DockerData {
                 DockerMessage::RefreshLogs(container_id) => {
                     // Fetch logs for the specified container without changing selection
                     let container_id_obj = ContainerId::from(container_id.as_str());
-                    
+
                     // Get the container to check if it exists
                     // For RefreshLogs, always get all logs from the beginning (timestamp 0)
                     let container_info = {
                         let app_data = self.app_data.lock();
-                        app_data.get_container_items().iter()
+                        app_data
+                            .get_container_items()
+                            .iter()
                             .find(|c| c.id == container_id_obj)
                             .map(|c| (c.id.clone(), 0u64)) // Always get all logs
                     };
-                    
+
                     if let Some((container_id, last_updated)) = container_info {
                         let spawn_id = SpawnId::Log(container_id.clone());
-                        
+
                         // Only spawn if not already spawned with a given id
                         if let std::collections::hash_map::Entry::Vacant(spawns) =
                             self.spawns.lock().entry(spawn_id)

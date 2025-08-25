@@ -23,13 +23,12 @@ use ui_stub as ui;
 
 // Re-exports for public API
 pub use app_data::{
-    AppData, ContainerId, ContainerItem, ContainerName, ContainerImage, ContainerStatus,
-    DockerCommand, Filter, Header, RunningState, State, StatefulList,
-    Columns, ContainerPorts, CpuTuple, FilterBy, MemTuple, SortedOrder,
-    ByteStats, CpuStats, Stats,
+    AppData, ByteStats, Columns, ContainerId, ContainerImage, ContainerItem, ContainerName,
+    ContainerPorts, ContainerStatus, CpuStats, CpuTuple, DockerCommand, Filter, FilterBy, Header,
+    MemTuple, RunningState, SortedOrder, State, StatefulList, Stats,
 };
 pub use app_error::AppError;
-pub use config::{Config, AppColors, Keymap};
+pub use config::{AppColors, Config, Keymap};
 pub use docker_data::{DockerData, DockerMessage};
 pub use events::{CoreCommand, CoreEvent, EventBus};
 pub use exec::{ExecMode, TerminalSize, tty_readable};
@@ -44,9 +43,9 @@ pub const ENTRY_POINT: &str = "/app/oxker";
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use std::sync::Arc;
-    use bollard::service::{ContainerSummary, Port};
     use app_data::{ContainerPorts, StatefulList};
+    use bollard::service::{ContainerSummary, Port};
+    use std::sync::Arc;
 
     /// Default test config, has timestamps turned off
     pub fn gen_config() -> Config {
@@ -90,7 +89,7 @@ pub mod tests {
     pub fn gen_containers() -> (Vec<ContainerId>, Vec<ContainerItem>) {
         gen_containers_n(3)
     }
-    
+
     pub fn gen_containers_n(n: usize) -> (Vec<ContainerId>, Vec<ContainerItem>) {
         let mut ids = Vec::new();
         let items = (1..=n)
@@ -108,7 +107,7 @@ pub mod tests {
         let (_ids, containers) = gen_containers_n(n);
         gen_appdata_with_containers(&containers)
     }
-    
+
     pub fn gen_appdata_with_containers(containers: &[ContainerItem]) -> AppData {
         let (event_bus, _receiver) = EventBus::new(100);
         let event_bus = Arc::new(event_bus);
@@ -119,9 +118,7 @@ pub mod tests {
 
     pub fn gen_container_summary(index: u8, state_str: &str) -> ContainerSummary {
         let id = Some(index.to_string());
-        let names = id
-            .as_ref()
-            .map(|id| vec![format!("/{id}_container_name")]);
+        let names = id.as_ref().map(|id| vec![format!("/{id}_container_name")]);
         let image = id.as_ref().map(|id| format!("{id}_image"));
         let image_id = id.as_ref().map(|id| format!("{id}_image_id"));
         let command = id.as_ref().map(|id| format!("{id}_command"));

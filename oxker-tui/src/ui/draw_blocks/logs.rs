@@ -8,9 +8,9 @@ use ratatui::{
     widgets::{List, ListItem, ListState as RatatuiListState, Paragraph},
 };
 
-use oxker_core::AppColors;
-use crate::ui::{FrameViewModel, GuiState, SelectablePanel, Status};
 use crate::handlers::UIContainerState;
+use crate::ui::{FrameViewModel, GuiState, SelectablePanel, Status};
+use oxker_core::AppColors;
 
 use super::{RIGHT_ARROW, generate_block};
 
@@ -48,17 +48,15 @@ pub fn draw(
             f.render_widget(paragraph, area);
         } else {
             // For colored logs, we need to create ListItems with proper styling
-            let items: Vec<ListItem> = logs.iter()
-                .map(|log| ListItem::new(log.as_str()))
-                .collect();
-            
+            let items: Vec<ListItem> = logs.iter().map(|log| ListItem::new(log.as_str())).collect();
+
             let padding = usize::from(area.height / 5);
             let items = List::new(items)
                 .block(block)
                 .highlight_symbol(RIGHT_ARROW)
                 .scroll_padding(padding)
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD));
-            
+
             let mut ratatui_state = RatatuiListState::default();
             let ui_log_pos = gui_state.lock().get_ui_logs_position();
             if ui_log_pos < logs.len() {
@@ -75,8 +73,11 @@ mod tests {
     use insta::assert_snapshot;
     use ratatui::style::{Color, Modifier};
 
+    use crate::ui::{
+        FrameViewModel, GuiState, SelectablePanel,
+        draw_blocks::tests::{COLOR_ORANGE, get_result, insert_logs, test_setup},
+    };
     use oxker_core::AppColors;
-    use crate::ui::{FrameViewModel, SelectablePanel, GuiState, draw_blocks::tests::{COLOR_ORANGE, get_result, insert_logs, test_setup}};
 
     #[test]
     fn test_placeholder() {

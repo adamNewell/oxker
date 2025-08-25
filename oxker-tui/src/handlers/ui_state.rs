@@ -1,6 +1,10 @@
+use oxker_core::events::types::{
+    ContainerItem as EventContainerItem, LogLine, Stats as EventStats,
+};
+use oxker_core::{
+    ContainerId, ContainerItem, DockerCommand, Header, State as ContainerState, StatefulList,
+};
 use std::collections::VecDeque;
-use oxker_core::{ContainerId, ContainerItem, DockerCommand, Header, StatefulList, State as ContainerState};
-use oxker_core::events::types::{ContainerItem as EventContainerItem, Stats as EventStats, LogLine};
 
 /// UI-specific state for managing containers
 /// This maintains the state needed for rendering and user interaction
@@ -45,23 +49,23 @@ impl UIContainerState {
             logs: VecDeque::new(),
             filter_term: String::new(),
             filter_by: Header::Name,
-            sort_header: None,  // Start unsorted
+            sort_header: None, // Start unsorted
             sort_ascending: true,
             version: 0,
             last_significant_change: 0,
         }
     }
-    
+
     /// Check if the state has changed significantly since last view model creation
     pub fn has_significant_changes(&self) -> bool {
         self.version != self.last_significant_change
     }
-    
+
     /// Mark that changes have been rendered
     pub fn mark_changes_rendered(&mut self) {
         self.last_significant_change = self.version;
     }
-    
+
     /// Increment version for change tracking
     fn increment_version(&mut self) {
         self.version = self.version.wrapping_add(1);
@@ -69,18 +73,26 @@ impl UIContainerState {
 
     /// Update the container list from events
     /// Returns the selected container ID if logs should be refreshed
-    pub fn update_containers(&mut self, event_containers: Vec<EventContainerItem>) -> Option<String> {
+    pub fn update_containers(
+        &mut self,
+        event_containers: Vec<EventContainerItem>,
+    ) -> Option<String> {
         // Preserve selection BEFORE draining items
-        let selected_id = self.containers.state.selected()
+        let selected_id = self
+            .containers
+            .state
+            .selected()
             .and_then(|idx| self.containers.items.get(idx))
             .map(|c| c.id.clone());
-        
+
         // Build a map of existing containers to preserve stats
-        let mut existing_containers: std::collections::HashMap<String, ContainerItem> = 
-            self.containers.items.drain(..)
-                .map(|c| (c.id.get().to_string(), c))
-                .collect();
-        
+        let mut existing_containers: std::collections::HashMap<String, ContainerItem> = self
+            .containers
+            .items
+            .drain(..)
+            .map(|c| (c.id.get().to_string(), c))
+            .collect();
+
         // Convert event containers to UI containers, preserving stats
         let containers: Vec<ContainerItem> = event_containers
             .into_iter()
@@ -92,11 +104,15 @@ impl UIContainerState {
                     existing.name = ec.name.into();
                     existing.image = ec.image.into();
                     existing.status = oxker_core::ContainerStatus::from(ec.status.clone());
-                    existing.ports = ec.ports.iter().map(|p| oxker_core::ContainerPorts {
-                        ip: p.ip.as_ref().and_then(|ip| ip.parse().ok()),
-                        private: p.private,
-                        public: p.public,
-                    }).collect();
+                    existing.ports = ec
+                        .ports
+                        .iter()
+                        .map(|p| oxker_core::ContainerPorts {
+                            ip: p.ip.as_ref().and_then(|ip| ip.parse().ok()),
+                            private: p.private,
+                            public: p.public,
+                        })
+                        .collect();
                     existing.state = match ec.state.as_str() {
                         "dead" => ContainerState::Dead,
                         "exited" => ContainerState::Exited,
@@ -110,7 +126,7 @@ impl UIContainerState {
                             } else {
                                 ContainerState::Running(oxker_core::RunningState::Healthy)
                             }
-                        },
+                        }
                         _ => ContainerState::Unknown,
                     };
                     existing
@@ -122,11 +138,14 @@ impl UIContainerState {
                         ec.image,
                         false, // is_oxker - we'll need to determine this
                         ec.name,
-                        ec.ports.iter().map(|p| oxker_core::ContainerPorts {
-                            ip: p.ip.as_ref().and_then(|ip| ip.parse().ok()),
-                            private: p.private,
-                            public: p.public,
-                        }).collect(),
+                        ec.ports
+                            .iter()
+                            .map(|p| oxker_core::ContainerPorts {
+                                ip: p.ip.as_ref().and_then(|ip| ip.parse().ok()),
+                                private: p.private,
+                                public: p.public,
+                            })
+                            .collect(),
                         // Parse state and health from status
                         match ec.state.as_str() {
                             "dead" => ContainerState::Dead,
@@ -141,7 +160,7 @@ impl UIContainerState {
                                 } else {
                                     ContainerState::Running(oxker_core::RunningState::Healthy)
                                 }
-                            },
+                            }
                             _ => ContainerState::Unknown,
                         },
                         oxker_core::ContainerStatus::from(ec.status),
@@ -152,7 +171,7 @@ impl UIContainerState {
 
         // Update items without resetting state
         self.containers.items = containers;
-        
+
         // Restore selection by ID since order might have changed
         if let Some(id) = selected_id {
             if let Some(index) = self.containers.items.iter().position(|c| c.id == id) {
@@ -165,29 +184,40 @@ impl UIContainerState {
             // Select first container if none selected
             self.containers.state.select(Some(0));
         }
-        
+
         // Update docker commands for selected container
         self.update_docker_commands();
-        
+
         self.increment_version();
-        
+
         // Return selected container ID for log refresh
-        self.containers.state.selected()
+        self.containers
+            .state
+            .selected()
             .and_then(|idx| self.containers.items.get(idx))
             .map(|c| c.id.get().to_string())
     }
 
     /// Update stats for a specific container
     pub fn update_container_stats(&mut self, container_id: String, stats: EventStats) {
-        if let Some(container) = self.containers.items.iter_mut().find(|c| c.id.get() == container_id) {
+        if let Some(container) = self
+            .containers
+            .items
+            .iter_mut()
+            .find(|c| c.id.get() == container_id)
+        {
             // Update CPU stats - push to back to add newest data on the right
-            container.cpu_stats.push_back(oxker_core::CpuStats::new(stats.cpu_usage));
+            container
+                .cpu_stats
+                .push_back(oxker_core::CpuStats::new(stats.cpu_usage));
             if container.cpu_stats.len() > 60 {
                 container.cpu_stats.pop_front();
             }
 
             // Update memory stats - push to back to add newest data on the right
-            container.mem_stats.push_back(oxker_core::ByteStats::new(stats.memory_usage));
+            container
+                .mem_stats
+                .push_back(oxker_core::ByteStats::new(stats.memory_usage));
             if container.mem_stats.len() > 60 {
                 container.mem_stats.pop_front();
             }
@@ -196,12 +226,16 @@ impl UIContainerState {
             // Update network stats
             container.rx = oxker_core::ByteStats::new(stats.network_rx);
             container.tx = oxker_core::ByteStats::new(stats.network_tx);
-            
+
             // Only increment version for selected container stats updates
-            if self.containers.state.selected()
+            if self
+                .containers
+                .state
+                .selected()
                 .and_then(|idx| self.containers.items.get(idx))
                 .map(|c| c.id.get() == container_id)
-                .unwrap_or(false) {
+                .unwrap_or(false)
+            {
                 self.increment_version();
             }
         }
@@ -210,8 +244,12 @@ impl UIContainerState {
     /// Add logs for a container
     pub fn add_logs(&mut self, container_id: String, logs: Vec<LogLine>) {
         // Only add logs if this is the selected container
-        if let Some(selected) = self.containers.state.selected()
-            .and_then(|idx| self.containers.items.get(idx)) {
+        if let Some(selected) = self
+            .containers
+            .state
+            .selected()
+            .and_then(|idx| self.containers.items.get(idx))
+        {
             if selected.id.get() == container_id {
                 // If logs are empty, it means the container has no logs to show
                 if logs.is_empty() {
@@ -249,7 +287,9 @@ impl UIContainerState {
 
     /// Get the currently selected container ID
     pub fn get_selected_container_id(&self) -> Option<ContainerId> {
-        self.containers.state.selected()
+        self.containers
+            .state
+            .selected()
             .and_then(|idx| self.containers.items.get(idx))
             .map(|c| c.id.clone())
     }
@@ -261,21 +301,25 @@ impl UIContainerState {
         self.update_docker_commands();
         self.increment_version();
     }
-    
+
     /// Update docker commands based on selected container state
     fn update_docker_commands(&mut self) {
-        if let Some(container) = self.containers.state.selected()
-            .and_then(|idx| self.containers.items.get(idx)) {
+        if let Some(container) = self
+            .containers
+            .state
+            .selected()
+            .and_then(|idx| self.containers.items.get(idx))
+        {
             let commands = DockerCommand::gen_vec(container.state.clone());
-            
+
             // Preserve the current selection if possible
             let current_selection = self.docker_commands.state.selected();
             let selected_command = current_selection
                 .and_then(|idx| self.docker_commands.items.get(idx))
                 .copied();
-            
+
             self.docker_commands = StatefulList::new(commands);
-            
+
             // Restore selection if the same command is still available
             if let Some(cmd) = selected_command {
                 if let Some(new_index) = self.docker_commands.items.iter().position(|&c| c == cmd) {
@@ -330,7 +374,6 @@ impl UIContainerState {
         self.logs.clear();
     }
 
-
     /// Get logs for display
     pub fn get_logs(&self) -> &VecDeque<String> {
         &self.logs
@@ -354,7 +397,9 @@ impl UIContainerState {
     }
 
     pub fn get_selected_docker_command(&self) -> Option<&DockerCommand> {
-        self.docker_commands.state.selected()
+        self.docker_commands
+            .state
+            .selected()
             .and_then(|idx| self.docker_commands.items.get(idx))
     }
 

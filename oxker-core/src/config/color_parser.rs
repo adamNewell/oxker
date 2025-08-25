@@ -52,18 +52,30 @@ impl AppColors {
             _ => {
                 // Try to parse RGB format: "rgb(r,g,b)" or "#RRGGBB"
                 if s.starts_with("rgb(") && s.ends_with(')') {
-                    let inner = &s[4..s.len()-1];
+                    let inner = &s[4..s.len() - 1];
                     let parts: Vec<&str> = inner.split(',').collect();
                     if parts.len() == 3 {
-                        let r = parts[0].trim().parse::<u8>().map_err(|_| format!("Invalid RGB color: {}", s))?;
-                        let g = parts[1].trim().parse::<u8>().map_err(|_| format!("Invalid RGB color: {}", s))?;
-                        let b = parts[2].trim().parse::<u8>().map_err(|_| format!("Invalid RGB color: {}", s))?;
+                        let r = parts[0]
+                            .trim()
+                            .parse::<u8>()
+                            .map_err(|_| format!("Invalid RGB color: {}", s))?;
+                        let g = parts[1]
+                            .trim()
+                            .parse::<u8>()
+                            .map_err(|_| format!("Invalid RGB color: {}", s))?;
+                        let b = parts[2]
+                            .trim()
+                            .parse::<u8>()
+                            .map_err(|_| format!("Invalid RGB color: {}", s))?;
                         return Ok(Color::Rgb(r, g, b));
                     }
                 } else if s.starts_with('#') && s.len() == 7 {
-                    let r = u8::from_str_radix(&s[1..3], 16).map_err(|_| format!("Invalid hex color: {}", s))?;
-                    let g = u8::from_str_radix(&s[3..5], 16).map_err(|_| format!("Invalid hex color: {}", s))?;
-                    let b = u8::from_str_radix(&s[5..7], 16).map_err(|_| format!("Invalid hex color: {}", s))?;
+                    let r = u8::from_str_radix(&s[1..3], 16)
+                        .map_err(|_| format!("Invalid hex color: {}", s))?;
+                    let g = u8::from_str_radix(&s[3..5], 16)
+                        .map_err(|_| format!("Invalid hex color: {}", s))?;
+                    let b = u8::from_str_radix(&s[5..7], 16)
+                        .map_err(|_| format!("Invalid hex color: {}", s))?;
                     return Ok(Color::Rgb(r, g, b));
                 } else if let Ok(index) = s.parse::<u8>() {
                     return Ok(Color::Indexed(index));

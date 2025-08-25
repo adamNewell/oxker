@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use super::{RIGHT_ARROW, generate_block};
-use oxker_core::AppColors;
-use crate::ui::{FrameViewModel, SelectablePanel, GuiState};
 use crate::handlers::UIContainerState;
+use crate::ui::{FrameViewModel, GuiState, SelectablePanel};
+use oxker_core::AppColors;
 use parking_lot::Mutex;
 use ratatui::{
     Frame,
@@ -12,7 +12,6 @@ use ratatui::{
     text::{Line, Span},
     widgets::{List, ListItem, ListState as RatatuiListState, Paragraph},
 };
-
 
 /// Draw the command panel
 pub fn draw(
@@ -25,9 +24,10 @@ pub fn draw(
 ) {
     let block = generate_block(area, colors, fd, gui_state, SelectablePanel::Commands)
         .bg(colors.commands.background);
-    
+
     let commands_view = &fd.commands_view;
-    let items = commands_view.commands
+    let items = commands_view
+        .commands
         .iter()
         .map(|c| {
             let lines = Line::from(vec![Span::styled(
@@ -43,7 +43,7 @@ pub fn draw(
             .block(block)
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
             .highlight_symbol(RIGHT_ARROW);
-        
+
         let mut ratatui_state = RatatuiListState::default();
         let ui_selection = gui_state.lock().get_ui_commands_selection();
         if ui_selection < commands_view.commands.len() {
@@ -60,12 +60,15 @@ pub fn draw(
 #[allow(clippy::unwrap_used)]
 mod tests {
     use insta::assert_snapshot;
+    use parking_lot::Mutex;
     use ratatui::style::{Color, Modifier};
     use std::sync::Arc;
-    use parking_lot::Mutex;
 
-    use oxker_core::{AppData, AppColors};
-    use crate::ui::{FrameViewModel, SelectablePanel, GuiState, draw_blocks::tests::{get_result, test_setup}};
+    use crate::ui::{
+        FrameViewModel, GuiState, SelectablePanel,
+        draw_blocks::tests::{get_result, test_setup},
+    };
+    use oxker_core::{AppColors, AppData};
 
     #[test]
     fn draw_blocks_commands_none() {
@@ -76,7 +79,8 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                let container_state = Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
+                let container_state =
+                    Arc::new(Mutex::new(crate::handlers::UIContainerState::new()));
                 super::draw(&container_state, area, colors, f, &fd, &setup.gui_state)
             })
             .unwrap();

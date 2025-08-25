@@ -8,8 +8,8 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use oxker_core::{AppColors, Keymap};
 use crate::ui::gui_state::BoxLocation;
+use oxker_core::{AppColors, Keymap};
 
 use super::{DESCRIPTION, NAME_TEXT, REPO, VERSION, popup};
 
@@ -447,10 +447,10 @@ pub fn draw(
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::too_many_lines)]
 mod tests {
-    use oxker_core::{AppColors, Keymap};
     use crossterm::event::{KeyCode, KeyModifiers};
     use insta::assert_snapshot;
     use jiff::tz::TimeZone;
+    use oxker_core::{AppColors, Keymap};
     use ratatui::style::{Color, Modifier};
 
     use crate::ui::draw_blocks::tests::{get_result, test_setup};
@@ -544,13 +544,7 @@ mod tests {
         setup
             .terminal
             .draw(|f| {
-                super::draw(
-                    colors,
-                    f,
-                    &setup.config.keymap,
-                    false,
-                    tz.as_ref(),
-                );
+                super::draw(colors, f, &setup.config.keymap, false, tz.as_ref());
             })
             .unwrap();
 

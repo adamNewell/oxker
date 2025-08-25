@@ -9,10 +9,13 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Clear, Paragraph},
 };
 
-use super::{CONSTRAINT_BUTTONS, CONSTRAINT_POPUP};
-use oxker_core::{ContainerName, AppColors, Keymap};
-use crate::ui::{GuiState, gui_state::{BoxLocation, Region, DeleteButton}};
 use super::popup;
+use super::{CONSTRAINT_BUTTONS, CONSTRAINT_POPUP};
+use crate::ui::{
+    GuiState,
+    gui_state::{BoxLocation, DeleteButton, Region},
+};
+use oxker_core::{AppColors, ContainerName, Keymap};
 
 /// Draw the delete confirm box in the centre of the screen
 /// take in container id and container name here?
@@ -124,8 +127,11 @@ mod tests {
     use insta::assert_snapshot;
     use ratatui::style::{Color, Modifier};
 
-    use oxker_core::{ContainerName, AppColors, Keymap};
-use crate::ui::{GuiState, gui_state::{BoxLocation, Region, DeleteButton}};
+    use crate::ui::{
+        GuiState,
+        gui_state::{BoxLocation, DeleteButton, Region},
+    };
+    use oxker_core::{AppColors, ContainerName, Keymap};
     // Placeholder test
     #[test]
     fn test_placeholder() {

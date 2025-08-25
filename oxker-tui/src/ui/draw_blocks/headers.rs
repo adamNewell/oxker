@@ -9,8 +9,8 @@ use ratatui::{
 };
 
 use super::{CONSTRAINT_100, MARGIN};
-use oxker_core::{Header, SortedOrder, AppColors, Keymap};
 use crate::ui::{FrameViewModel, GuiState, Status, gui_state::Region};
+use oxker_core::{AppColors, Header, Keymap, SortedOrder};
 /// Generate a header paragraph with it's width
 fn gen_header<'a>(
     colors: AppColors,
@@ -32,7 +32,11 @@ fn gen_header<'a>(
 }
 
 // Generate a block for the header, if the header is currently being used to sort a column, then highlight it white
-fn gen_header_block<'a>(colors: AppColors, fd: &FrameViewModel, header: Header) -> (Color, &'a str) {
+fn gen_header_block<'a>(
+    colors: AppColors,
+    fd: &FrameViewModel,
+    header: Header,
+) -> (Color, &'a str) {
     let mut color = colors.headers_bar.text;
     let mut suffix = "";
     if let Some((a, b)) = &fd.sorted_by {
@@ -220,8 +224,8 @@ mod tests {
     use ratatui::style::Color;
     use uuid::Uuid;
 
-    use oxker_core::{Header, SortedOrder, AppColors, Keymap};
-use crate::ui::FrameViewModel;
+    use crate::ui::FrameViewModel;
+    use oxker_core::{AppColors, Header, Keymap, SortedOrder};
     // Placeholder test
     #[test]
     fn test_placeholder() {

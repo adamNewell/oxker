@@ -1,26 +1,21 @@
-use std::{
-    sync::{Arc, atomic::AtomicBool},
-};
 use crossterm::{
     event::{DisableMouseCapture, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
     execute,
 };
 use parking_lot::Mutex;
 use ratatui::layout::Rect;
+use std::sync::{Arc, atomic::AtomicBool};
 use tokio::sync::mpsc::Receiver;
 use uuid::Uuid;
 
-mod message;
 mod command_mapper;
+mod message;
 
-use crate::ui::{DeleteButton, GuiState, SelectablePanel, Status, Ui};
 use crate::handlers::UIContainerState;
-use oxker_core::{
-    CoreHandle, CoreCommand, DockerCommand, Header,
-    tty_readable, ExecMode,
-};
-pub use message::InputMessages;
+use crate::ui::{DeleteButton, GuiState, SelectablePanel, Status, Ui};
 use command_mapper::CommandMapper;
+pub use message::InputMessages;
+use oxker_core::{CoreCommand, CoreHandle, DockerCommand, ExecMode, Header, tty_readable};
 
 /// Handle all input events
 pub struct InputHandler {
@@ -83,7 +78,7 @@ impl InputHandler {
         // Update UI state to track the current sort - three states: unsorted, ascending, descending
         let (should_sort, ascending) = {
             let mut ui_state = self.container_state.lock();
-            
+
             if let Some(current_header) = &ui_state.sort_header {
                 if current_header == &selected_header {
                     // Same header clicked - cycle through states
@@ -109,9 +104,11 @@ impl InputHandler {
                 (true, true)
             }
         };
-        
+
         if should_sort {
-            if let Some(core_command) = CommandMapper::header_to_sort_command(selected_header, ascending) {
+            if let Some(core_command) =
+                CommandMapper::header_to_sort_command(selected_header, ascending)
+            {
                 if let Err(e) = self.core_handle.execute_command(core_command).await {
                     tracing::error!("Failed to execute sort command: {}", e);
                 }
@@ -139,7 +136,9 @@ impl InputHandler {
     async fn confirm_delete(&self) {
         let id = self.gui_state.lock().get_delete_container();
         if let Some(id) = id {
-            if let Some(core_command) = CommandMapper::docker_command_to_core(DockerCommand::Delete, id) {
+            if let Some(core_command) =
+                CommandMapper::docker_command_to_core(DockerCommand::Delete, id)
+            {
                 if let Err(e) = self.core_handle.execute_command(core_command).await {
                     tracing::error!("Failed to delete container: {}", e);
                     self.gui_state.lock().status_push(Status::Error);
@@ -163,7 +162,7 @@ impl InputHandler {
                 let ui_state = self.container_state.lock();
                 ui_state.get_selected_container_id()
             };
-            
+
             if let Some(id) = container_id {
                 // Create ExecMode with the container ID
                 // For now, always use External mode (docker CLI)
@@ -245,26 +244,32 @@ impl InputHandler {
         // Get selected container and command from UI state
         let (container_id, command) = {
             let container_state = self.container_state.lock();
-            let container_id = container_state.get_selected_container_id()
+            let container_id = container_state
+                .get_selected_container_id()
                 .ok_or_else(|| "No container selected".to_string())?;
-            
+
             // Use UI selection to get the command
             let ui_selection = self.gui_state.lock().get_ui_commands_selection();
-            let command = container_state.docker_commands.items.get(ui_selection)
+            let command = container_state
+                .docker_commands
+                .items
+                .get(ui_selection)
                 .ok_or_else(|| "No command selected".to_string())?;
             (container_id, *command)
         }; // Drop lock before await
-        
+
         // Check if running in container
         if self.core_handle.is_oxker() {
             return Err("Cannot execute commands from within a container".to_string());
         }
-        
+
         // Execute the command
-        if let Some(core_command) = CommandMapper::docker_command_to_core(command, container_id.clone()) {
+        if let Some(core_command) =
+            CommandMapper::docker_command_to_core(command, container_id.clone())
+        {
             self.core_handle.execute_command(core_command).await?;
         }
-        
+
         Ok(())
     }
 
@@ -323,11 +328,14 @@ impl InputHandler {
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
+                {
                     let core_handle = self.core_handle.clone();
                     let id = container_id.get().to_string();
                     tokio::spawn(async move {
-                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                        let _ = core_handle
+                            .execute_command(CoreCommand::RefreshLogs(id))
+                            .await;
                     });
                 }
             }
@@ -349,11 +357,14 @@ impl InputHandler {
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
+                {
                     let core_handle = self.core_handle.clone();
                     let id = container_id.get().to_string();
                     tokio::spawn(async move {
-                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                        let _ = core_handle
+                            .execute_command(CoreCommand::RefreshLogs(id))
+                            .await;
                     });
                 }
             }
@@ -366,7 +377,9 @@ impl InputHandler {
             SelectablePanel::Commands => {
                 let max_commands = self.container_state.lock().docker_commands.items.len();
                 if max_commands > 0 {
-                    self.gui_state.lock().set_ui_commands_selection(max_commands - 1);
+                    self.gui_state
+                        .lock()
+                        .set_ui_commands_selection(max_commands - 1);
                 }
             }
         }
@@ -418,9 +431,11 @@ impl InputHandler {
             KeyCode::Esc => {
                 self.container_state.lock().clear_filter();
                 // Clear filter by sending empty filter command
-                if let Err(e) = self.core_handle.execute_command(
-                    CoreCommand::FilterContainers(String::new())
-                ).await {
+                if let Err(e) = self
+                    .core_handle
+                    .execute_command(CoreCommand::FilterContainers(String::new()))
+                    .await
+                {
                     tracing::error!("Failed to clear filter: {}", e);
                 }
                 self.gui_state.lock().status_del(Status::Filter);
@@ -431,9 +446,11 @@ impl InputHandler {
             {
                 // Apply the filter
                 let filter_term = self.container_state.lock().filter_term.clone();
-                if let Err(e) = self.core_handle.execute_command(
-                    CoreCommand::FilterContainers(filter_term)
-                ).await {
+                if let Err(e) = self
+                    .core_handle
+                    .execute_command(CoreCommand::FilterContainers(filter_term))
+                    .await
+                {
                     tracing::error!("Failed to apply filter: {}", e);
                 }
                 self.gui_state.lock().status_del(Status::Filter);
@@ -641,7 +658,11 @@ impl InputHandler {
             {
                 self.gui_state.lock().status_push(Status::Filter);
                 // Trigger container refresh when entering filter mode
-                if let Err(e) = self.core_handle.execute_command(CoreCommand::RefreshContainers).await {
+                if let Err(e) = self
+                    .core_handle
+                    .execute_command(CoreCommand::RefreshContainers)
+                    .await
+                {
                     tracing::error!("Failed to refresh containers: {}", e);
                 }
             }
@@ -758,11 +779,14 @@ impl InputHandler {
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
+                {
                     let core_handle = self.core_handle.clone();
                     let id = container_id.get().to_string();
                     tokio::spawn(async move {
-                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                        let _ = core_handle
+                            .execute_command(CoreCommand::RefreshLogs(id))
+                            .await;
                     });
                 }
             }
@@ -790,11 +814,14 @@ impl InputHandler {
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
+                {
                     let core_handle = self.core_handle.clone();
                     let id = container_id.get().to_string();
                     tokio::spawn(async move {
-                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                        let _ = core_handle
+                            .execute_command(CoreCommand::RefreshLogs(id))
+                            .await;
                     });
                 }
             }

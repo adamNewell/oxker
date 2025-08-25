@@ -2,26 +2,21 @@
 // Zigbuild is stuck on 1.87.0, which means Mac builds won't work when using collapsible ifs
 #![forbid(unsafe_code)]
 
-
 use oxker_tui::input_handler::InputMessages;
 use parking_lot::Mutex;
-use std::{
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
 };
 use tokio::sync::mpsc::Receiver;
 use tokio::task::JoinHandle;
 use tracing::{Level, error, info};
 
 // Import from oxker-core
-use oxker_core::{
-    Config, CoreHandle, EventBus,
-};
+use oxker_core::{Config, CoreHandle, EventBus};
 
-use oxker_tui::ui::{GuiState, Rerender, Status, Ui};
 use oxker_tui::handlers::UIEventHandler;
+use oxker_tui::ui::{GuiState, Rerender, Status, Ui};
 
 /// Enable tracing, only really used in debug mode, for now
 /// write to file if `-g` is set?
@@ -32,22 +27,17 @@ fn setup_tracing() {
 /// Clean up terminal state before exit
 fn cleanup_terminal() {
     use crossterm::{
-        execute,
-        terminal::{disable_raw_mode, LeaveAlternateScreen},
         cursor::Show,
         event::DisableMouseCapture,
+        execute,
+        terminal::{LeaveAlternateScreen, disable_raw_mode},
     };
     use std::io::stdout;
-    
+
     // Best effort terminal cleanup
-    let _ = execute!(
-        stdout(),
-        LeaveAlternateScreen,
-        DisableMouseCapture,
-        Show
-    );
+    let _ = execute!(stdout(), LeaveAlternateScreen, DisableMouseCapture, Show);
     let _ = disable_raw_mode();
-    
+
     // Force exit after cleanup
     std::process::exit(0);
 }
@@ -77,7 +67,7 @@ fn handler_init(
 #[tokio::main]
 async fn main() {
     setup_tracing();
-    
+
     // Set panic hook to clean up terminal on panic
     std::panic::set_hook(Box::new(|panic_info| {
         // Clean up terminal before panic
@@ -88,7 +78,7 @@ async fn main() {
             crossterm::event::DisableMouseCapture,
             crossterm::cursor::Show
         );
-        
+
         // Print panic info
         eprintln!("Application panicked: {}", panic_info);
     }));
@@ -97,63 +87,80 @@ async fn main() {
 
     // Create event bus for the new event-driven architecture
     let (event_bus, receiver) = EventBus::new(100);
-    
+
     // Initialize CoreHandle with Docker connection
     let core_handle = core_init(event_bus, config.clone()).await;
-    
+
     let gui_state = Arc::new(Mutex::new(GuiState::new(&redraw, config.show_logs)));
     let is_running = Arc::new(AtomicBool::new(true));
 
     if config.gui {
         let (input_tx, input_rx) = tokio::sync::mpsc::channel(32);
-        
+
         // Create and spawn UIEventHandler
-        let ui_handler = UIEventHandler::new(
-            gui_state.clone(),
-            redraw.clone(),
-        );
-        
+        let ui_handler = UIEventHandler::new(gui_state.clone(), redraw.clone());
+
         // Get container state for sharing with InputHandler
         let container_state = ui_handler.get_container_state();
-        
-        let input_handler_task = handler_init(core_handle.clone(), &gui_state, container_state.clone(), input_rx, &is_running);
-        
+
+        let input_handler_task = handler_init(
+            core_handle.clone(),
+            &gui_state,
+            container_state.clone(),
+            input_rx,
+            &is_running,
+        );
+
         let ui_task: JoinHandle<()> = tokio::spawn(async move {
             ui_handler.run(receiver).await;
         });
-        
+
         info!("UIEventHandler started");
-        
+
         // Trigger initial container refresh
-        if let Err(e) = core_handle.execute_command(oxker_core::CoreCommand::RefreshContainers).await {
+        if let Err(e) = core_handle
+            .execute_command(oxker_core::CoreCommand::RefreshContainers)
+            .await
+        {
             error!("Failed to refresh containers on startup: {}", e);
         }
-        
+
         // Wait a bit for initial container selection
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        
+
         // Trigger log refresh for the initially selected container
         if let Some(container_id) = container_state.lock().get_selected_container_id() {
-            if let Err(e) = core_handle.execute_command(
-                oxker_core::CoreCommand::RefreshLogs(container_id.get().to_string())
-            ).await {
+            if let Err(e) = core_handle
+                .execute_command(oxker_core::CoreCommand::RefreshLogs(
+                    container_id.get().to_string(),
+                ))
+                .await
+            {
                 error!("Failed to refresh logs on startup: {}", e);
             }
         }
-        
+
         // Pass container state and config to UI
-        Ui::start(container_state, config, gui_state, input_tx, is_running, redraw).await;
-        
+        Ui::start(
+            container_state,
+            config,
+            gui_state,
+            input_tx,
+            is_running,
+            redraw,
+        )
+        .await;
+
         // Drop the core_handle to close the EventBus sender, which will cause
         // the UIEventHandler to exit when the receiver returns None
         drop(core_handle);
-        
+
         // Signal shutdown by dropping the input channel and event bus
         drop(input_handler_task);
-        
+
         // Don't wait for UI task - exit immediately
         drop(ui_task);
-        
+
         // Ensure terminal is cleaned up before exit
         cleanup_terminal();
     } else {
@@ -164,7 +171,7 @@ async fn main() {
             // In debug mode, just check state periodically
             let state = core_handle.state_view();
             info!("Containers: {}", state.containers.len());
-            
+
             if let Some(Ok(to_sleep)) = u128::from(config.docker_interval_ms)
                 .checked_sub(now.elapsed().as_millis())
                 .map(u64::try_from)
@@ -173,12 +180,15 @@ async fn main() {
             }
             // Display container info from state view
             for container in &state.containers {
-                info!("Container: {} ({}) - {}", container.name, container.id, container.state);
+                info!(
+                    "Container: {} ({}) - {}",
+                    container.name, container.id, container.state
+                );
             }
             now = std::time::Instant::now();
         }
     }
-    
+
     info!("oxker TUI shutdown");
 }
 
@@ -191,9 +201,8 @@ pub mod tests {
     use bollard::service::{ContainerSummary, Port};
 
     use oxker_core::{
-        AppData, ContainerId, ContainerItem, ContainerPorts, ContainerStatus, Filter,
-        RunningState, State, StatefulList,
-        AppColors, Config, Keymap,
+        AppColors, AppData, Config, ContainerId, ContainerItem, ContainerPorts, ContainerStatus,
+        Filter, Keymap, RunningState, State, StatefulList,
     };
     use oxker_tui::ui::Rerender;
 
@@ -249,13 +258,9 @@ pub mod tests {
         let id1 = ContainerId::from("1");
         let id2 = ContainerId::from("2");
         let id3 = ContainerId::from("3");
-        
-        let containers = vec![
-            gen_item(&id1, 0),
-            gen_item(&id2, 1),
-            gen_item(&id3, 2),
-        ];
-        
+
+        let containers = vec![gen_item(&id1, 0), gen_item(&id2, 1), gen_item(&id3, 2)];
+
         (vec![id1, id2, id3], containers)
     }
 
