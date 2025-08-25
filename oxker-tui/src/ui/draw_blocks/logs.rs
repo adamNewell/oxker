@@ -60,8 +60,9 @@ pub fn draw(
                 .highlight_style(Style::default().add_modifier(Modifier::BOLD));
             
             let mut ratatui_state = RatatuiListState::default();
-            if fd.log_view.position < logs.len() {
-                ratatui_state.select(Some(fd.log_view.position));
+            let ui_log_pos = gui_state.lock().get_ui_logs_position();
+            if ui_log_pos < logs.len() {
+                ratatui_state.select(Some(ui_log_pos));
             }
             f.render_stateful_widget(items, area, &mut ratatui_state);
         }

@@ -52,6 +52,7 @@ pub struct Ui {
     now: Instant,
     rerender: Arc<Rerender>,
     terminal: Terminal<CrosstermBackend<Stdout>>,
+    cached_view_model: Option<FrameViewModel>,
 }
 
 impl Ui {
@@ -89,6 +90,7 @@ impl Ui {
                     now: Instant::now(),
                     rerender,
                     terminal,
+                    cached_view_model: None,
                 };
                 if let Err(e) = ui.draw_ui().await {
                     error!("{e}");
@@ -226,26 +228,38 @@ impl Ui {
             // }
             if self.should_redraw(&mut drawn_at, docker_interval_ms) {
                 let screen_width = self.gui_state.lock().get_screen_width();
-                let fd = FrameViewModel::from_state(
-                    &*self.container_state.lock(),
-                    &*self.gui_state.lock(),
-                    colors,
-                    screen_width,
-                );
-
-                let exec = fd.status.contains(&Status::Exec);
-                if exec {
-                    self.exec().await;
+                
+                // Check if we need to recreate the view model
+                let needs_update = {
+                    let ui_state = self.container_state.lock();
+                    self.cached_view_model.is_none() || ui_state.has_significant_changes()
+                };
+                
+                if needs_update {
+                    let mut ui_state = self.container_state.lock();
+                    self.cached_view_model = Some(FrameViewModel::from_state(
+                        &*ui_state,
+                        &*self.gui_state.lock(),
+                        colors,
+                        screen_width,
+                    ));
+                    ui_state.mark_changes_rendered();
                 }
-
-                if self
-                    .terminal
-                    .draw(|frame| {
-                        draw_frame(&self.container_state, &self.config, colors, &keymap, frame, &fd, &self.gui_state);
-                    })
-                    .is_err()
-                {
-                    return Err(AppError::Terminal);
+                
+                if let Some(fd) = &self.cached_view_model {
+                    let exec = fd.status.contains(&Status::Exec);
+                    
+                    if exec {
+                        self.exec().await;
+                    } else if self
+                        .terminal
+                        .draw(|frame| {
+                            draw_frame(&self.container_state, &self.config, colors, &keymap, frame, fd, &self.gui_state);
+                        })
+                        .is_err()
+                    {
+                        return Err(AppError::Terminal);
+                    }
                 }
             }
 
@@ -274,6 +288,8 @@ impl Ui {
                         self.gui_state.lock().clear_area_map();
                         self.terminal.autoresize().ok();
                         self.gui_state.lock().set_screen_width(width);
+                        // Invalidate cached view model on resize
+                        self.cached_view_model = None;
                     }
                 }
             }
@@ -383,12 +399,13 @@ fn draw_frame(
     if let Some(rect) = containers_commands.get(1) {
         draw_blocks::commands::draw(container_state, *rect, colors, f, fd, gui_state);
 
-        // Can calculate the max string length here, and then use that to keep the ports section as small as possible (+4 for some padding + border)
+        // Dynamic ports panel width: IP(min 2, max 16) + 3 spaces + Private(7) + 2 spaces + Public(7) + 2 borders
         let ports_len = if let Some(port_view) = &fd.port_view {
-            u16::try_from(port_view.max_lens.0 + port_view.max_lens.1 + port_view.max_lens.2 + 2)
-                .unwrap_or(26)
+            let ip_width = port_view.max_lens.0.max(2).min(16);
+            // ip_width + 3 + 7 + 2 + 7 + 2 borders
+            u16::try_from(ip_width + 3 + 7 + 2 + 7 + 2).unwrap_or(37)
         } else {
-            26
+            23  // Minimum width: 2 + 3 + 7 + 2 + 7 + 2 = 23
         };
 
         let lower = Layout::default()

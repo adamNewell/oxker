@@ -133,9 +133,13 @@ update_release_body_and_changelog() {
 	sed -i -r -E "s=merges \#([0-9]+)=merges [#\1](${GIT_REPO_URL}/pull/\1)=g" CHANGELOG.md
 }
 
-# update version in cargo.toml, to match selected current version
+# update version in cargo.toml files, to match selected current version
 update_version_number_in_files() {
 	sed -i "s|^version = .*|version = \"${MAJOR}.${MINOR}.${PATCH}\"|" Cargo.toml
+	sed -i "s|^version = .*|version = \"${MAJOR}.${MINOR}.${PATCH}\"|" oxker-core/Cargo.toml
+	sed -i "s|^version = .*|version = \"${MAJOR}.${MINOR}.${PATCH}\"|" oxker-tui/Cargo.toml
+	# Update oxker-core dependency version in oxker-tui
+	sed -i "s|^oxker-core = { version = \"[^\"]*\"|oxker-core = { version = \"${MAJOR}.${MINOR}.${PATCH}\"|" oxker-tui/Cargo.toml
 }
 
 # Work out the current version, based on git tags
@@ -182,14 +186,16 @@ check_tag() {
 
 # run all tests
 cargo_test() {
-	cargo test -- --test-threads=1
+	cargo test --workspace -- --test-threads=1
 	ask_continue
 }
 
 # Simulate publishing to crates.io
 cargo_publish_dry_run() {
-	echo -e "${PURPLE}cargo publish --dry-run${RESET}"
-	cargo publish --dry-run
+	echo -e "${PURPLE}cargo publish --dry-run -p oxker-core${RESET}"
+	cargo publish --dry-run -p oxker-core
+	echo -e "${PURPLE}cargo publish --dry-run -p oxker-tui${RESET}"
+	cargo publish --dry-run -p oxker-tui
 	ask_continue
 }
 
@@ -204,29 +210,29 @@ check_cross() {
 # Build, using cross-rs, for linux x86 musl
 cross_build_x86_linux() {
 	check_cross
-	echo -e "${YELLOW}cross build --target x86_64-unknown-linux-musl --release${RESET}"
-	cross build --target x86_64-unknown-linux-musl --release
+	echo -e "${YELLOW}cross build --target x86_64-unknown-linux-musl --release -p oxker-tui${RESET}"
+	cross build --target x86_64-unknown-linux-musl --release -p oxker-tui
 }
 
 # Build, using cross-rs, for linux arm64 musl
 cross_build_aarch64_linux() {
 	check_cross
-	echo -e "${YELLOW}cross build --target aarch64-unknown-linux-musl --release${RESET}"
-	cross build --target aarch64-unknown-linux-musl --release
+	echo -e "${YELLOW}cross build --target aarch64-unknown-linux-musl --release -p oxker-tui${RESET}"
+	cross build --target aarch64-unknown-linux-musl --release -p oxker-tui
 }
 
 # Build, using cross-rs, for linux armv6 musl
 cross_build_armv6_linux() {
 	check_cross
-	echo -e "${YELLOW}cross build --target arm-unknown-linux-musleabihf --release${RESET}"
-	cross build --target arm-unknown-linux-musleabihf --release
+	echo -e "${YELLOW}cross build --target arm-unknown-linux-musleabihf --release -p oxker-tui${RESET}"
+	cross build --target arm-unknown-linux-musleabihf --release -p oxker-tui
 }
 
 # Build, using cross-rs, for windows x86
 cross_build_x86_windows() {
 	check_cross
-	echo -e "${YELLOW}cross build --target x86_64-pc-windows-gnu --release${RESET}"
-	cross build --target x86_64-pc-windows-gnu --release
+	echo -e "${YELLOW}cross build --target x86_64-pc-windows-gnu --release -p oxker-tui${RESET}"
+	cross build --target x86_64-pc-windows-gnu --release -p oxker-tui
 }
 
 # Build, using zig-build, for Apple silicon

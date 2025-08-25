@@ -194,6 +194,11 @@ pub mod test_utils {
                     image: c.image.to_string(),
                     state: c.state.to_string(),
                     status: c.status.to_string(),
+                    ports: c.ports.iter().map(|p| oxker_core::events::types::ContainerPort {
+                        ip: p.ip.map(|ip| ip.to_string()),
+                        private: p.private,
+                        public: p.public,
+                    }).collect(),
                 })
                 .collect();
             

@@ -19,7 +19,7 @@ impl CommandMapper {
     }
 
     /// Convert header selection to sort command
-    pub fn header_to_sort_command(header: oxker_core::Header) -> Option<CoreCommand> {
+    pub fn header_to_sort_command(header: oxker_core::Header, ascending: bool) -> Option<CoreCommand> {
         let field = match header {
             oxker_core::Header::Name => SortField::Name,
             oxker_core::Header::State => SortField::State,
@@ -32,9 +32,13 @@ impl CommandMapper {
             oxker_core::Header::Tx => SortField::NetworkTx,
         };
         
-        // Default to ascending order - in a real implementation, 
-        // this would check current sort state to toggle
-        Some(CoreCommand::SortContainers(field, SortOrder::Ascending))
+        let order = if ascending {
+            SortOrder::Ascending
+        } else {
+            SortOrder::Descending
+        };
+        
+        Some(CoreCommand::SortContainers(field, order))
     }
 
     /// Get the appropriate refresh command for the current panel

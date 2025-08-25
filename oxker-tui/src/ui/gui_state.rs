@@ -188,6 +188,9 @@ pub struct GuiState {
     show_logs: bool,
     status: HashSet<Status>,
     pub info_box_text: Option<(String, Instant)>,
+    // UI-only selection states (don't affect business logic)
+    ui_commands_selection: usize,
+    ui_logs_position: usize,
 }
 impl GuiState {
     pub fn new(redraw: &Arc<Rerender>, show_logs: bool) -> Self {
@@ -208,6 +211,8 @@ impl GuiState {
             selected_panel: SelectablePanel::default(),
             show_logs,
             status: HashSet::new(),
+            ui_commands_selection: 0,
+            ui_logs_position: 0,
         }
     }
     /// Increase the height of the log panel, then rerender
@@ -491,5 +496,56 @@ impl GuiState {
     pub fn reset_info_box(&mut self) {
         self.info_box_text = None;
         self.rerender.update_draw();
+    }
+
+    /// UI-only selection management (no business logic impact)
+    pub fn get_ui_commands_selection(&self) -> usize {
+        self.ui_commands_selection
+    }
+
+    pub fn set_ui_commands_selection(&mut self, index: usize) {
+        self.ui_commands_selection = index;
+        self.rerender.update_draw();
+    }
+
+    pub fn scroll_ui_commands_up(&mut self, max_items: usize) {
+        if max_items > 0 {
+            self.ui_commands_selection = if self.ui_commands_selection == 0 {
+                max_items - 1
+            } else {
+                self.ui_commands_selection - 1
+            };
+            self.rerender.update_draw();
+        }
+    }
+
+    pub fn scroll_ui_commands_down(&mut self, max_items: usize) {
+        if max_items > 0 {
+            self.ui_commands_selection = (self.ui_commands_selection + 1) % max_items;
+            self.rerender.update_draw();
+        }
+    }
+
+    pub fn get_ui_logs_position(&self) -> usize {
+        self.ui_logs_position
+    }
+
+    pub fn set_ui_logs_position(&mut self, position: usize) {
+        self.ui_logs_position = position;
+        self.rerender.update_draw();
+    }
+
+    pub fn scroll_ui_logs_up(&mut self, max_logs: usize) {
+        if self.ui_logs_position > 0 {
+            self.ui_logs_position -= 1;
+            self.rerender.update_draw();
+        }
+    }
+
+    pub fn scroll_ui_logs_down(&mut self, max_logs: usize) {
+        if max_logs > 0 && self.ui_logs_position < max_logs - 1 {
+            self.ui_logs_position += 1;
+            self.rerender.update_draw();
+        }
     }
 }

@@ -13,7 +13,7 @@ use crate::{
     ENTRY_POINT,
     app_error::AppError,
     config::Config,
-    events::{EventBus, CoreEvent, types::ContainerItem as EventContainerItem},
+    events::{EventBus, CoreEvent, types::{ContainerItem as EventContainerItem, ContainerPort as EventContainerPort}},
 };
 pub use container_state::*;
 
@@ -162,8 +162,13 @@ impl AppData {
                 id: c.id.get().to_string(),
                 name: c.name.get().to_string(),
                 image: c.image.to_string(),
-                state: c.state.to_string(),
+                state: c.state.as_str().to_string(),
                 status: c.status.to_string(),
+                ports: c.ports.iter().map(|p| EventContainerPort {
+                    ip: p.ip.map(|ip| ip.to_string()),
+                    private: p.private,
+                    public: p.public,
+                }).collect(),
             }
         }).collect();
         
@@ -1003,6 +1008,32 @@ impl AppData {
                 }
             }
             // self.redraw.set_true("update_containers");
+        }
+        
+        // Publish ContainerListUpdate event with current container data
+        #[cfg(not(test))]
+        {
+            let containers: Vec<crate::events::types::ContainerItem> = self.containers.items.iter().map(|c| {
+                crate::events::types::ContainerItem {
+                    id: c.id.get().to_string(),
+                    name: c.name.get().to_string(),
+                    image: c.image.get().to_string(),
+                    state: c.state.as_str().to_string(),
+                    status: c.status.to_string(),
+                    ports: c.ports.iter().map(|p| crate::events::types::ContainerPort {
+                        ip: p.ip.map(|ip| ip.to_string()),
+                        private: p.private,
+                        public: p.public,
+                    }).collect(),
+                }
+            }).collect();
+            
+            let event_bus = self.event_bus.clone();
+            tokio::spawn(async move {
+                if let Err(e) = event_bus.publish(CoreEvent::ContainerListUpdate(containers)).await {
+                    eprintln!("Failed to publish container update event: {}", e);
+                }
+            });
         }
     }
 

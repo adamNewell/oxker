@@ -29,6 +29,29 @@ fn setup_tracing() {
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
 }
 
+/// Clean up terminal state before exit
+fn cleanup_terminal() {
+    use crossterm::{
+        execute,
+        terminal::{disable_raw_mode, LeaveAlternateScreen},
+        cursor::Show,
+        event::DisableMouseCapture,
+    };
+    use std::io::stdout;
+    
+    // Best effort terminal cleanup
+    let _ = execute!(
+        stdout(),
+        LeaveAlternateScreen,
+        DisableMouseCapture,
+        Show
+    );
+    let _ = disable_raw_mode();
+    
+    // Force exit after cleanup
+    std::process::exit(0);
+}
+
 /// Initialize CoreHandle which manages Docker connection internally
 async fn core_init(event_bus: EventBus, config: Config) -> CoreHandle {
     CoreHandle::new(event_bus, config)
@@ -41,19 +64,34 @@ fn handler_init(
     container_state: Arc<Mutex<oxker_tui::handlers::UIContainerState>>,
     input_rx: Receiver<InputMessages>,
     is_running: &Arc<AtomicBool>,
-) {
+) -> JoinHandle<()> {
     tokio::spawn(oxker_tui::input_handler::InputHandler::start(
         core_handle,
         Arc::clone(gui_state),
         container_state,
         Arc::clone(is_running),
         input_rx,
-    ));
+    ))
 }
 
 #[tokio::main]
 async fn main() {
     setup_tracing();
+    
+    // Set panic hook to clean up terminal on panic
+    std::panic::set_hook(Box::new(|panic_info| {
+        // Clean up terminal before panic
+        let _ = crossterm::terminal::disable_raw_mode();
+        let _ = crossterm::execute!(
+            std::io::stdout(),
+            crossterm::terminal::LeaveAlternateScreen,
+            crossterm::event::DisableMouseCapture,
+            crossterm::cursor::Show
+        );
+        
+        // Print panic info
+        eprintln!("Application panicked: {}", panic_info);
+    }));
     let config = Config::new();
     let redraw = Arc::new(Rerender::new());
 
@@ -78,7 +116,7 @@ async fn main() {
         // Get container state for sharing with InputHandler
         let container_state = ui_handler.get_container_state();
         
-        handler_init(core_handle.clone(), &gui_state, container_state.clone(), input_rx, &is_running);
+        let input_handler_task = handler_init(core_handle.clone(), &gui_state, container_state.clone(), input_rx, &is_running);
         
         let ui_task: JoinHandle<()> = tokio::spawn(async move {
             ui_handler.run(receiver).await;
@@ -86,13 +124,38 @@ async fn main() {
         
         info!("UIEventHandler started");
         
+        // Trigger initial container refresh
+        if let Err(e) = core_handle.execute_command(oxker_core::CoreCommand::RefreshContainers).await {
+            error!("Failed to refresh containers on startup: {}", e);
+        }
+        
+        // Wait a bit for initial container selection
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        
+        // Trigger log refresh for the initially selected container
+        if let Some(container_id) = container_state.lock().get_selected_container_id() {
+            if let Err(e) = core_handle.execute_command(
+                oxker_core::CoreCommand::RefreshLogs(container_id.get().to_string())
+            ).await {
+                error!("Failed to refresh logs on startup: {}", e);
+            }
+        }
+        
         // Pass container state and config to UI
         Ui::start(container_state, config, gui_state, input_tx, is_running, redraw).await;
         
-        // Wait for UI task
-        if let Err(e) = ui_task.await {
-            error!("UIEventHandler task failed: {}", e);
-        }
+        // Drop the core_handle to close the EventBus sender, which will cause
+        // the UIEventHandler to exit when the receiver returns None
+        drop(core_handle);
+        
+        // Signal shutdown by dropping the input channel and event bus
+        drop(input_handler_task);
+        
+        // Don't wait for UI task - exit immediately
+        drop(ui_task);
+        
+        // Ensure terminal is cleaned up before exit
+        cleanup_terminal();
     } else {
         info!("in debug mode\n");
         let mut now = std::time::Instant::now();

@@ -17,7 +17,7 @@ use crate::ui::{DeleteButton, GuiState, SelectablePanel, Status, Ui};
 use crate::handlers::UIContainerState;
 use oxker_core::{
     CoreHandle, CoreCommand, DockerCommand, Header,
-    tty_readable,
+    tty_readable, ExecMode,
 };
 pub use message::InputMessages;
 use command_mapper::CommandMapper;
@@ -80,9 +80,49 @@ impl InputHandler {
 
     /// Sort the containers by a given header
     async fn sort(&self, selected_header: Header) {
-        if let Some(core_command) = CommandMapper::header_to_sort_command(selected_header) {
-            if let Err(e) = self.core_handle.execute_command(core_command).await {
-                tracing::error!("Failed to execute sort command: {}", e);
+        // Update UI state to track the current sort - three states: unsorted, ascending, descending
+        let (should_sort, ascending) = {
+            let mut ui_state = self.container_state.lock();
+            
+            if let Some(current_header) = &ui_state.sort_header {
+                if current_header == &selected_header {
+                    // Same header clicked - cycle through states
+                    if ui_state.sort_ascending {
+                        // Currently ascending -> go to descending
+                        ui_state.sort_ascending = false;
+                        (true, false)
+                    } else {
+                        // Currently descending -> go to unsorted
+                        ui_state.sort_header = None;
+                        (false, true) // Values don't matter when not sorting
+                    }
+                } else {
+                    // Different header clicked - start with ascending
+                    ui_state.sort_header = Some(selected_header.clone());
+                    ui_state.sort_ascending = true;
+                    (true, true)
+                }
+            } else {
+                // Currently unsorted - start with ascending
+                ui_state.sort_header = Some(selected_header.clone());
+                ui_state.sort_ascending = true;
+                (true, true)
+            }
+        };
+        
+        if should_sort {
+            if let Some(core_command) = CommandMapper::header_to_sort_command(selected_header, ascending) {
+                if let Err(e) = self.core_handle.execute_command(core_command).await {
+                    tracing::error!("Failed to execute sort command: {}", e);
+                }
+            }
+        } else {
+            // Reset to unsorted state - this might require a new command or just rely on container order
+            // For now, we'll sort by Name ascending as the "unsorted" state
+            if let Some(core_command) = CommandMapper::header_to_sort_command(Header::Name, true) {
+                if let Err(e) = self.core_handle.execute_command(core_command).await {
+                    tracing::error!("Failed to reset sort: {}", e);
+                }
             }
         }
     }
@@ -90,12 +130,9 @@ impl InputHandler {
     /// Send a quit message to docker, to abort all spawns, if an error is returned, set is_running to false here instead
     /// If gui_status is Error or Init, then just set the is_running to false immediately, for a quicker exit
     fn quit(&self) {
-        let status = self.gui_state.lock().get_status();
-        let contains = |s: Status| status.contains(&s);
-        if !contains(Status::Error) | !contains(Status::Init) {
-            self.is_running
-                .store(false, std::sync::atomic::Ordering::SeqCst);
-        }
+        // Always set is_running to false to trigger application exit
+        self.is_running
+            .store(false, std::sync::atomic::Ordering::SeqCst);
     }
 
     /// This is executed from the Delete Confirm dialog, and will send an internal message to actually remove the given container
@@ -121,10 +158,20 @@ impl InputHandler {
     async fn exec_key(&self) {
         let is_oxker = self.core_handle.is_oxker();
         if !is_oxker && tty_readable() {
-            // TODO: Implement exec functionality with CoreHandle
-            // This requires deeper integration with Docker exec API
-            tracing::warn!("Exec functionality not yet implemented with CoreHandle");
-            self.gui_state.lock().status_push(Status::Error);
+            // Get selected container ID
+            let container_id = {
+                let ui_state = self.container_state.lock();
+                ui_state.get_selected_container_id()
+            };
+            
+            if let Some(id) = container_id {
+                // Create ExecMode with the container ID
+                // For now, always use External mode (docker CLI)
+                let exec_mode = ExecMode::External(Arc::new(id));
+                self.gui_state.lock().set_exec_mode(exec_mode);
+            } else {
+                self.gui_state.lock().set_info_box("No container selected");
+            }
         }
     }
 
@@ -200,7 +247,10 @@ impl InputHandler {
             let container_state = self.container_state.lock();
             let container_id = container_state.get_selected_container_id()
                 .ok_or_else(|| "No container selected".to_string())?;
-            let command = container_state.get_selected_docker_command()
+            
+            // Use UI selection to get the command
+            let ui_selection = self.gui_state.lock().get_ui_commands_selection();
+            let command = container_state.docker_commands.items.get(ui_selection)
                 .ok_or_else(|| "No command selected".to_string())?;
             (container_id, *command)
         }; // Drop lock before await
@@ -231,9 +281,9 @@ impl InputHandler {
     fn logs_forward(&self, modifier: KeyModifiers) {
         let panel = self.gui_state.lock().get_selected_panel();
         if panel == SelectablePanel::Logs {
+            let max_logs = self.container_state.lock().logs.len();
             for _ in 0..self.get_modifier_total(modifier) {
-                let width = self.gui_state.lock().get_screen_width();
-                self.container_state.lock().log_forward(width);
+                self.gui_state.lock().scroll_ui_logs_down(max_logs);
             }
         }
     }
@@ -242,8 +292,9 @@ impl InputHandler {
     fn logs_back(&self, modifier: KeyModifiers) {
         let panel = self.gui_state.lock().get_selected_panel();
         if panel == SelectablePanel::Logs {
+            let max_logs = self.container_state.lock().logs.len();
             for _ in 0..self.get_modifier_total(modifier) {
-                self.container_state.lock().log_back();
+                self.gui_state.lock().scroll_ui_logs_up(max_logs);
             }
         }
     }
@@ -269,12 +320,22 @@ impl InputHandler {
         match selected_panel {
             SelectablePanel::Containers => {
                 self.container_state.lock().first_container();
+                // Reset UI logs position when switching containers
+                self.gui_state.lock().set_ui_logs_position(0);
+                // Trigger log refresh for newly selected container
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                    let core_handle = self.core_handle.clone();
+                    let id = container_id.get().to_string();
+                    tokio::spawn(async move {
+                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                    });
+                }
             }
             SelectablePanel::Logs => {
-                self.container_state.lock().log_start();
+                self.gui_state.lock().set_ui_logs_position(0);
             }
             SelectablePanel::Commands => {
-                self.container_state.lock().first_docker_command();
+                self.gui_state.lock().set_ui_commands_selection(0);
             }
         }
     }
@@ -285,12 +346,28 @@ impl InputHandler {
         match selected_panel {
             SelectablePanel::Containers => {
                 self.container_state.lock().last_container();
+                // Reset UI logs position when switching containers
+                self.gui_state.lock().set_ui_logs_position(0);
+                // Trigger log refresh for newly selected container
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                    let core_handle = self.core_handle.clone();
+                    let id = container_id.get().to_string();
+                    tokio::spawn(async move {
+                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                    });
+                }
             }
             SelectablePanel::Logs => {
-                self.container_state.lock().log_end();
+                let max_logs = self.container_state.lock().logs.len();
+                if max_logs > 0 {
+                    self.gui_state.lock().set_ui_logs_position(max_logs - 1);
+                }
             }
             SelectablePanel::Commands => {
-                self.container_state.lock().last_docker_command();
+                let max_commands = self.container_state.lock().docker_commands.items.len();
+                if max_commands > 0 {
+                    self.gui_state.lock().set_ui_commands_selection(max_commands - 1);
+                }
             }
         }
     }
@@ -678,14 +755,26 @@ impl InputHandler {
                 for _ in 0..self.get_modifier_total(modifier) {
                     self.container_state.lock().next_container();
                 }
+                // Reset UI logs position when switching containers
+                self.gui_state.lock().set_ui_logs_position(0);
+                // Trigger log refresh for newly selected container
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                    let core_handle = self.core_handle.clone();
+                    let id = container_id.get().to_string();
+                    tokio::spawn(async move {
+                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                    });
+                }
             }
             SelectablePanel::Logs => {
+                let max_logs = self.container_state.lock().logs.len();
                 for _ in 0..self.get_modifier_total(modifier) {
-                    self.container_state.lock().log_next();
+                    self.gui_state.lock().scroll_ui_logs_down(max_logs);
                 }
             }
             SelectablePanel::Commands => {
-                self.container_state.lock().next_docker_command();
+                let max_commands = self.container_state.lock().docker_commands.items.len();
+                self.gui_state.lock().scroll_ui_commands_down(max_commands);
             }
         }
     }
@@ -698,14 +787,26 @@ impl InputHandler {
                 for _ in 0..self.get_modifier_total(modifier) {
                     self.container_state.lock().previous_container();
                 }
+                // Reset UI logs position when switching containers
+                self.gui_state.lock().set_ui_logs_position(0);
+                // Trigger log refresh for newly selected container
+                if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+                    let core_handle = self.core_handle.clone();
+                    let id = container_id.get().to_string();
+                    tokio::spawn(async move {
+                        let _ = core_handle.execute_command(CoreCommand::RefreshLogs(id)).await;
+                    });
+                }
             }
             SelectablePanel::Logs => {
+                let max_logs = self.container_state.lock().logs.len();
                 for _ in 0..self.get_modifier_total(modifier) {
-                    self.container_state.lock().log_previous();
+                    self.gui_state.lock().scroll_ui_logs_up(max_logs);
                 }
             }
             SelectablePanel::Commands => {
-                self.container_state.lock().previous_docker_command();
+                let max_commands = self.container_state.lock().docker_commands.items.len();
+                self.gui_state.lock().scroll_ui_commands_up(max_commands);
             }
         }
     }

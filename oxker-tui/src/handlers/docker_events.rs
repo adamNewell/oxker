@@ -97,6 +97,12 @@ impl UIEventHandler {
     fn handle_container_list_update(&self, containers: Vec<EventContainerItem>) {
         debug!("Updating container list with {} containers", containers.len());
         
+        // Check if this is the first container update
+        let _is_first_update = {
+            let container_state = self.container_state.lock();
+            container_state.containers.items.is_empty()
+        };
+        
         // Update container state
         {
             let mut container_state = self.container_state.lock();

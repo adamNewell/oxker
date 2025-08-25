@@ -310,6 +310,20 @@ impl State {
             _ => false,
         }
     }
+    
+    /// Get raw state string for API/event communication
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Dead => "dead",
+            Self::Exited => "exited",
+            Self::Paused => "paused",
+            Self::Removing => "removing",
+            Self::Restarting => "restarting",
+            Self::Running(_) => "running",
+            Self::Unknown => "unknown",
+        }
+    }
+    
     /// Color of the state for the containers section
     pub const fn get_color(self, colors: AppColors) -> Color {
         match self {

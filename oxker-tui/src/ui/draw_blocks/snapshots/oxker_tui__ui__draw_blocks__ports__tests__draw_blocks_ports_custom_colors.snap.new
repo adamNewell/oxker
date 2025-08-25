@@ -1,0 +1,13 @@
+---
+source: oxker-tui/src/ui/draw_blocks/ports.rs
+assertion_line: 300
+expression: setup.terminal.backend()
+---
+"╭─────────── ports ────────────╮"
+"│ipprivatepublic               │"
+"│80019001                      │"
+"│                              │"
+"│                              │"
+"│                              │"
+"│                              │"
+"╰──────────────────────────────╯"

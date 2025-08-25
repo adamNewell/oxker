@@ -10,4 +10,5 @@ pub enum DockerMessage {
     Control((DockerCommand, ContainerId)),
     Exec(Sender<Arc<Docker>>),
     Update,
+    RefreshLogs(String),
 }

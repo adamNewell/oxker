@@ -45,12 +45,12 @@ jobs:
       - name: build
         if: matrix.target == 'aarch64-apple-darwin'
         run: |
-          docker run --rm -v $(pwd):/io -w /io ghcr.io/rust-cross/cargo-zigbuild cargo zigbuild --release --target aarch64-apple-darwin
+          docker run --rm -v $(pwd):/io -w /io ghcr.io/rust-cross/cargo-zigbuild cargo zigbuild --release --target aarch64-apple-darwin -p oxker-tui
      
       # Build all other targets using Cross
       - name: build
         if: matrix.target != 'aarch64-apple-darwin'
-        run: cross build --target ${{ matrix.target }} --release
+        run: cross build --target ${{ matrix.target }} --release -p oxker-tui
 
       # Compress the output
       - name: compress windows
@@ -154,8 +154,10 @@ jobs:
       - name: update rust stable
         run: rustup update stable
       - uses: actions/checkout@v5
-      - name: Publish Dry Run
-        run: cargo publish --dry-run
+      - name: Publish Dry Run - Core
+        run: cargo publish --dry-run -p oxker-core
+      - name: Publish Dry Run - TUI
+        run: cargo publish --dry-run -p oxker-tui
 
   cargo_publish:
     environment: crates.io
@@ -167,6 +169,10 @@ jobs:
       - name: update rust stable
         run: rustup update stable
       - uses: actions/checkout@v5
-      - name: Publish
-        run: cargo publish
+      - name: Publish Core
+        run: cargo publish -p oxker-core
+      - name: Wait for crates.io to index
+        run: sleep 30
+      - name: Publish TUI
+        run: cargo publish -p oxker-tui
 

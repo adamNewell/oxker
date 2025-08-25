@@ -162,11 +162,17 @@ docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock:ro -v /some_loc
 
 ## Build step
 
+This project uses a Rust workspace structure with two crates:
+- `oxker-core` - Core functionality and Docker API interactions
+- `oxker-tui` - Terminal user interface
+
 ### x86_64
 
 ```shell
-cargo build --release
+cargo build --release -p oxker-tui
 ```
+
+The binary will be located at `target/release/oxker`
 
 ### Raspberry pi
 
@@ -175,7 +181,7 @@ requires docker & <a href='https://github.com/cross-rs/cross' target='_blank' re
 #### 64bit pi (pi 4, pi zero w 2)
 
 ```shell
-cross build --target aarch64-unknown-linux-gnu --release
+cross build --target aarch64-unknown-linux-gnu --release -p oxker-tui
 ```
 
 #### 32bit pi (pi zero w)
@@ -183,7 +189,7 @@ cross build --target aarch64-unknown-linux-gnu --release
 Tested, and fully working on pi zero w, running Raspberry Pi OS 32 bit, the initial logs parsing can take an extended period of time if thousands of lines long, suggest running with a -d argument of 5000
 
 ```shell
-cross build --target arm-unknown-linux-musleabihf --release
+cross build --target arm-unknown-linux-musleabihf --release -p oxker-tui
 ```
 
 If no memory information available, try appending either ```/boot/cmdline.txt``` or ```/boot/firmware/cmdline.txt``` with
@@ -203,7 +209,11 @@ see <a href="https://forums.raspberrypi.com/viewtopic.php?t=203128" target='_bla
 The work has been done, so far the tests don't effect any running containers, but this may change in the future.
 
 ```shell
-cargo test
+# Run all tests in the workspace
+cargo test --workspace
+
+# Note: Due to test infrastructure limitations, run with single thread to avoid timeouts
+cargo test --workspace -- --test-threads=1
 ```
 
 Run some example docker images

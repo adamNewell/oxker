@@ -45,8 +45,9 @@ pub fn draw(
             .highlight_symbol(RIGHT_ARROW);
         
         let mut ratatui_state = RatatuiListState::default();
-        if let Some(selected) = commands_view.selected {
-            ratatui_state.select(Some(selected));
+        let ui_selection = gui_state.lock().get_ui_commands_selection();
+        if ui_selection < commands_view.commands.len() {
+            ratatui_state.select(Some(ui_selection));
         }
         f.render_stateful_widget(items, area, &mut ratatui_state);
     } else {

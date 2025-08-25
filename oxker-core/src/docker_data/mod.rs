@@ -24,7 +24,7 @@ use crate::{
     app_data::{AppData, ContainerId, DockerCommand, State},
     app_error::AppError,
     config::Config,
-    events::{EventBus},
+    events::{EventBus, types::{CoreEvent, Stats, LogLine}},
 };
 mod message;
 pub use message::DockerMessage;
@@ -133,6 +133,7 @@ impl DockerData {
         state: State,
         spawn_id: SpawnId,
         spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
+        event_bus: Arc<EventBus>,
     ) {
         let id = spawn_id.get_id();
         let mut stream = docker
@@ -148,6 +149,10 @@ impl DockerData {
         while let Some(Ok(stats)) = stream.next().await {
             // Memory stats are only collected if the container is alive - is this the behaviour we want?
 
+            let mem_limit = stats.memory_stats.as_ref()
+                .and_then(|m| m.limit)
+                .unwrap_or_default();
+            
             let (mem_stat, cpu_stats) = if state.is_alive() {
                 let mem_cache = stats.memory_stats.as_ref().map_or(&0, |i| {
                     i.stats
@@ -182,14 +187,25 @@ impl DockerData {
                 id,
                 cpu_stats,
                 mem_stat,
-                stats
-                    .memory_stats
-                    .unwrap_or_default()
-                    .limit
-                    .unwrap_or_default(),
+                mem_limit,
                 rx,
                 tx,
             );
+            
+            // Publish stats update event
+            if let (Some(cpu), Some(mem)) = (cpu_stats, mem_stat) {
+                let _ = event_bus.publish(CoreEvent::ContainerStatsUpdate {
+                    container_id: id.get().to_string(),
+                    stats: Stats {
+                        container_id: id.get().to_string(),
+                        cpu_usage: cpu,
+                        memory_usage: mem,
+                        memory_limit: mem_limit,
+                        network_rx: rx,
+                        network_tx: tx,
+                    },
+                }).await;
+            }
         }
         spawns.lock().remove(&spawn_id);
     }
@@ -209,6 +225,7 @@ impl DockerData {
                     state,
                     spawn_id,
                     Arc::clone(&self.spawns),
+                    Arc::clone(&self.event_bus),
                 )));
             }
         }
@@ -258,6 +275,7 @@ impl DockerData {
         since: u64,
         spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
         stderr: bool,
+        event_bus: Arc<EventBus>,
     ) {
         let options = Some(LogsOptions {
             stdout: true,
@@ -276,7 +294,22 @@ impl DockerData {
                 output.push(data);
             }
         }
-        app_data.lock().update_log_by_id(output, &id);
+        
+        // Update internal state
+        app_data.lock().update_log_by_id(output.clone(), &id);
+        
+        // Always publish logs event, even if empty
+        let logs: Vec<LogLine> = output.into_iter().map(|msg| LogLine {
+            container_id: id.get().to_string(),
+            timestamp: String::new(), // Timestamp is embedded in message
+            message: msg,
+        }).collect();
+        
+        let _ = event_bus.publish(CoreEvent::ContainerLogsUpdate {
+            container_id: id.get().to_string(),
+            logs,
+        }).await;
+        
         spawns.lock().remove(&SpawnId::Log(id));
     }
 
@@ -290,10 +323,11 @@ impl DockerData {
             let spawns = Arc::clone(&self.spawns);
             let std_err = self.config.show_std_err;
             let init = Arc::clone(&init);
+            let event_bus = Arc::clone(&self.event_bus);
             self.spawns.lock().insert(
                 SpawnId::Log(id.clone()),
                 tokio::spawn(async move {
-                    Self::update_log(app_data, docker, id, 0, spawns, std_err).await;
+                    Self::update_log(app_data, docker, id, 0, spawns, std_err, event_bus).await;
                     init.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 }),
             );
@@ -312,7 +346,7 @@ impl DockerData {
         self.update_all_container_stats();
 
         while init.load(std::sync::atomic::Ordering::SeqCst) != all_ids_len {
-            self.app_data.lock().sort_containers();
+            // Don't sort containers automatically - only sort when user requests it
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
         // TODO: Emit loading finished event
@@ -335,11 +369,13 @@ impl DockerData {
                     last_updated,
                     Arc::clone(&self.spawns),
                     self.config.show_std_err,
+                    Arc::clone(&self.event_bus),
                 )));
             }
         }
         self.update_all_container_stats();
-        self.app_data.lock().sort_containers();
+        // Don't sort containers automatically - only sort when user requests it
+        // self.app_data.lock().sort_containers();
     }
 
     /// Set the global error as the docker error
@@ -418,6 +454,38 @@ impl DockerData {
                     docker_tx.send(Arc::clone(&self.docker)).ok();
                 }
                 DockerMessage::Update => self.update_everything().await,
+                DockerMessage::RefreshLogs(container_id) => {
+                    // Fetch logs for the specified container without changing selection
+                    let container_id_obj = ContainerId::from(container_id.as_str());
+                    
+                    // Get the container to check if it exists
+                    // For RefreshLogs, always get all logs from the beginning (timestamp 0)
+                    let container_info = {
+                        let app_data = self.app_data.lock();
+                        app_data.get_container_items().iter()
+                            .find(|c| c.id == container_id_obj)
+                            .map(|c| (c.id.clone(), 0u64)) // Always get all logs
+                    };
+                    
+                    if let Some((container_id, last_updated)) = container_info {
+                        let spawn_id = SpawnId::Log(container_id.clone());
+                        
+                        // Only spawn if not already spawned with a given id
+                        if let std::collections::hash_map::Entry::Vacant(spawns) =
+                            self.spawns.lock().entry(spawn_id)
+                        {
+                            spawns.insert(tokio::spawn(Self::update_log(
+                                Arc::clone(&self.app_data),
+                                Arc::clone(&self.docker),
+                                container_id,
+                                last_updated,
+                                Arc::clone(&self.spawns),
+                                self.config.show_std_err,
+                                Arc::clone(&self.event_bus),
+                            )));
+                        }
+                    }
+                }
             }
         }
     }

@@ -1,8 +1,9 @@
 use std::sync::Arc;
 use std::time::Instant;
 use parking_lot::Mutex;
-use oxker_core::{Config, AppColors, Keymap, EventBus};
-use oxker_tui::ui::{GuiState, Rerender, FrameViewModel};
+use oxker_core::{Config, AppColors, Keymap};
+use oxker_tui::ui::{GuiState, Rerender};
+use oxker_tui::ui::view_models::FrameViewModel;
 use oxker_tui::handlers::UIContainerState;
 use oxker_core::events::types::{ContainerItem as EventContainerItem, Stats};
 

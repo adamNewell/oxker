@@ -87,10 +87,11 @@ fn generate_block<'a>(
 
     let mut title = match panel {
         SelectablePanel::Containers => {
-            format!("{}{}", panel.title(), fd.container_title)
+            fd.container_title.clone()
         }
         SelectablePanel::Logs => {
-            format!("{}{}", panel.title(), fd.log_view.title)
+            // Use the full title from the view model
+            fd.log_view.title.clone()
         }
         SelectablePanel::Commands => String::new(),
     };
@@ -101,16 +102,8 @@ fn generate_block<'a>(
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .title(ratatui::text::Line::from(title).left_aligned());
-
-    if panel == SelectablePanel::Logs {
-        if let Some(x) = fd.scroll_title.as_ref() {
-            block = block
-                .title_bottom(x.to_owned())
-                .title_alignment(ratatui::layout::Alignment::Right);
-        }
-    }
     if !fd.status.contains(&Status::Filter) {
-        if fd.selected_panel == panel {
+        if gui_state.lock().get_selected_panel() == panel {
             block = block.border_style(Style::default().fg(colors.borders.selected));
         } else {
             block = block.border_style(Style::default().fg(colors.borders.unselected));
@@ -369,9 +362,8 @@ pub mod tests {
             } else {
                 vec![]
             },
-            position: 0,
             title: if has_containers {
-                "container_1 logs".to_string()
+                "Logs - container_1 - nginx:latest".to_string()
             } else {
                 "No container selected".to_string()
             },
@@ -387,13 +379,12 @@ pub mod tests {
                 DockerCommand::Resume,
                 DockerCommand::Delete,
             ],
-            selected: Some(0),
         };
         
         println!("TEST: About to create FrameViewModel");
         
         // Get all gui_state values in a single lock
-        let (delete_confirm, info_text, is_loading, loading_icon, log_height, show_logs, selected_panel, status) = {
+        let (delete_confirm, info_text, is_loading, loading_icon, log_height, show_logs, status) = {
             println!("TEST: Acquiring gui_state lock");
             let gui = gui_state.lock();
             println!("TEST: Got gui_state lock");
@@ -404,7 +395,6 @@ pub mod tests {
                 gui.get_loading().to_string(),
                 gui.get_log_height(),
                 gui.get_show_logs(),
-                gui.get_selected_panel(),
                 gui.get_status(),
             );
             println!("TEST: Releasing gui_state lock");
@@ -446,7 +436,6 @@ pub mod tests {
             show_logs,
             port_view,
             commands_view,
-            selected_panel,
             scroll_title: None,
             sorted_by: Some((Header::State, SortedOrder::Asc)),
             status,

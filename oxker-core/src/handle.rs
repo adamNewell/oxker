@@ -117,27 +117,8 @@ impl CoreHandle {
                     .await
                     .map_err(|e| format!("Failed to send update message: {}", e))?;
                 
-                // Get current containers from AppData
-                let event_containers = {
-                    let app_data = self.app_data.lock();
-                    let containers = app_data.get_container_items();
-                    
-                    // Convert to event type
-                    containers
-                        .into_iter()
-                        .map(|c| crate::events::types::ContainerItem {
-                            id: c.id.get().to_string(),
-                            name: c.name.to_string(),
-                            image: c.image.to_string(),
-                            state: c.state.to_string(),
-                            status: c.status.to_string(),
-                        })
-                        .collect::<Vec<_>>()
-                }; // Drop lock before await
-                
-                self.event_bus
-                    .publish(CoreEvent::ContainerListUpdate(event_containers))
-                    .await?;
+                // DockerData will publish ContainerListUpdate event when it's done
+                // This avoids the race condition of trying to read containers before they're updated
             }
             CoreCommand::RefreshStats(container_id) => {
                 // Stats are automatically updated by DockerData heartbeat
@@ -173,20 +154,11 @@ impl CoreHandle {
                 }
             }
             CoreCommand::RefreshLogs(container_id) => {
-                // Trigger a log update through DockerData
+                // Send a specific log refresh request for this container
                 self.docker_tx
-                    .send(DockerMessage::Update)
+                    .send(DockerMessage::RefreshLogs(container_id))
                     .await
-                    .map_err(|e| format!("Failed to send update message: {}", e))?;
-                    
-                // For now, emit an empty log update event
-                // Real logs will come through DockerData updates
-                self.event_bus
-                    .publish(CoreEvent::ContainerLogsUpdate {
-                        container_id,
-                        logs: vec![],
-                    })
-                    .await?;
+                    .map_err(|e| format!("Failed to send refresh logs message: {}", e))?;
             }
             CoreCommand::RemoveContainer(container_id) => {
                 // Send delete command to DockerData
@@ -256,8 +228,13 @@ impl CoreHandle {
                             id: c.id.get().to_string(),
                             name: c.name.to_string(),
                             image: c.image.to_string(),
-                            state: c.state.to_string(),
+                            state: c.state.as_str().to_string(),
                             status: c.status.to_string(),
+                            ports: c.ports.iter().map(|p| crate::events::types::ContainerPort {
+                                ip: p.ip.map(|ip| ip.to_string()),
+                                private: p.private,
+                                public: p.public,
+                            }).collect(),
                         })
                         .collect::<Vec<_>>()
                 }; // Drop lock before await
@@ -294,8 +271,13 @@ impl CoreHandle {
                             id: c.id.get().to_string(),
                             name: c.name.to_string(),
                             image: c.image.to_string(),
-                            state: c.state.to_string(),
+                            state: c.state.as_str().to_string(),
                             status: c.status.to_string(),
+                            ports: c.ports.iter().map(|p| crate::events::types::ContainerPort {
+                                ip: p.ip.map(|ip| ip.to_string()),
+                                private: p.private,
+                                public: p.public,
+                            }).collect(),
                         })
                         .collect::<Vec<_>>()
                 }; // Drop lock before await
@@ -349,8 +331,13 @@ impl CoreHandle {
                 id: c.id.get().to_string(),
                 name: c.name.to_string(),
                 image: c.image.to_string(),
-                state: c.state.to_string(),
+                state: c.state.as_str().to_string(),
                 status: c.status.to_string(),
+                ports: c.ports.iter().map(|p| crate::events::types::ContainerPort {
+                    ip: p.ip.map(|ip| ip.to_string()),
+                    private: p.private,
+                    public: p.public,
+                }).collect(),
             })
             .collect();
         

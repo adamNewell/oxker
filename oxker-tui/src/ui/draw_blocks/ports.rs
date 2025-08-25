@@ -34,7 +34,11 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameViewModel) {
                     .add_modifier(Modifier::BOLD),
             ));
 
-        let (ip, private, public) = port_view.max_lens;
+        // Column specifications
+        let (ip_len, _, _) = port_view.max_lens;
+        let ip_width = ip_len.max(2).min(16); // Min 2 (for "ip" header), max 16 characters
+        let private_width = 7; // Always 7 text columns for private
+        let public_width = 7;  // Always 7 text columns for public
 
         if port_view.ports.is_empty() {
             let text = match port_view.state {
@@ -47,22 +51,22 @@ pub fn draw(area: Rect, colors: AppColors, f: &mut Frame, fd: &FrameViewModel) {
                 .bg(colors.chart_ports.background);
             f.render_widget(paragraph, area);
         } else {
-            let mut output = vec![Line::from(
-                Span::from(format!(
-                    "{:>ip$}{:>private$}{:>public$}",
-                    "ip", "private", "public"
-                ))
-                .fg(colors.chart_ports.headings),
-            )];
+            let mut output = vec![];
+            
+            // Header line: IP + 3 spaces + Private(7) + 3 spaces + Public(7)
+            let header_line = format!(
+                "{:>ip_width$}   {:>private_width$}  {:>public_width$}",
+                "ip", "private", "public"
+            );
+            output.push(Line::from(Span::from(header_line).fg(colors.chart_ports.headings)));
+            
             for item in &port_view.ports {
                 let strings = item.get_all();
-
-                let line = vec![
-                    Span::from(format!("{:>ip$}", strings.0)).fg(colors.chart_ports.text),
-                    Span::from(format!("{:>private$}", strings.1)).fg(colors.chart_ports.text),
-                    Span::from(format!("{:>public$}", strings.2)).fg(colors.chart_ports.text),
-                ];
-                output.push(Line::from(line));
+                let data_line = format!(
+                    "{:>ip_width$}   {:>private_width$}  {:>public_width$}",
+                    strings.0, strings.1, strings.2
+                );
+                output.push(Line::from(Span::from(data_line).fg(colors.chart_ports.text)));
             }
             let paragraph = Paragraph::new(output)
                 .block(block)

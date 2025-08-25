@@ -41,7 +41,6 @@ pub struct PortView {
 #[derive(Debug, Clone)]
 pub struct LogView {
     pub logs: Vec<String>,
-    pub position: usize,
     pub title: String,
 }
 
@@ -49,7 +48,6 @@ pub struct LogView {
 #[derive(Debug, Clone)]
 pub struct CommandsView {
     pub commands: Vec<DockerCommand>,
-    pub selected: Option<usize>,
 }
 
 /// All data needed for rendering a frame
@@ -74,7 +72,6 @@ pub struct FrameViewModel {
     pub show_logs: bool,
     pub port_view: Option<PortView>,
     pub commands_view: CommandsView,
-    pub selected_panel: SelectablePanel,
     pub scroll_title: Option<String>,
     pub sorted_by: Option<(Header, SortedOrder)>,
     pub status: HashSet<Status>,
@@ -150,20 +147,27 @@ impl FrameViewModel {
         // Prepare log view
         let log_view = LogView {
             logs: ui_state.logs.iter().cloned().collect(),
-            position: ui_state.log_position,
-            title: selected_container_data
-                .map(|c| format!("{} logs", c.name))
-                .unwrap_or_else(|| "No container selected".to_string()),
+            title: selected_container_data.map_or_else(String::new, |c| {
+                format!("Logs - {} - {}", c.name.get(), c.image.get())
+            }),
         };
 
         // Prepare commands view
         let commands_view = CommandsView {
             commands: ui_state.docker_commands.items.clone(),
-            selected: ui_state.docker_commands.state.selected(),
         };
 
         // Calculate columns based on container data
         let columns = calculate_columns(&containers, screen_width);
+
+        // Calculate scroll title for logs (shows column position)
+        let scroll_title = if !ui_state.logs.is_empty() {
+            // TODO: Need to calculate actual column position and max width
+            // For now, just show placeholder
+            Some(format!(" 1/80 → "))
+        } else {
+            None
+        };
 
         // Build the complete view model
         Self {
@@ -173,7 +177,7 @@ impl FrameViewModel {
             chart_data,
             color_logs: true, // This should come from config
             columns,
-            container_title: create_container_title(ui_state.get_container_count()),
+            container_title: create_container_title(ui_state.get_container_count(), ui_state.containers.state.selected()),
             delete_confirm: gui_state.get_delete_container(),
             filter_by: FilterBy::Name, // Convert from ui_state.filter_by
             filter_term: if ui_state.filter_term.is_empty() { None } else { Some(ui_state.filter_term.clone()) },
@@ -186,9 +190,10 @@ impl FrameViewModel {
             show_logs: gui_state.get_show_logs(),
             port_view,
             commands_view,
-            selected_panel: gui_state.get_selected_panel(),
-            scroll_title: None, // Will need to calculate based on selected container
-            sorted_by: Some((ui_state.sort_header.clone(), if ui_state.sort_ascending { SortedOrder::Asc } else { SortedOrder::Desc })),
+            scroll_title,
+            sorted_by: ui_state.sort_header.as_ref().map(|header| 
+                (header.clone(), if ui_state.sort_ascending { SortedOrder::Asc } else { SortedOrder::Desc })
+            ),
             status: gui_state.get_status(),
         }
     }
@@ -214,25 +219,51 @@ fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
 
 /// Calculate column widths based on container data
 fn calculate_columns(containers: &[ContainerView], screen_width: u16) -> Columns {
-    // This is a simplified version - the real implementation would calculate
-    // based on actual container data
+    // Calculate max widths for each column based on data
+    let mut name_width = 4; // min "Name"
+    let mut state_width = 5; // min "State"
+    let mut status_width = 6; // min "Status"
+    let mut image_width = 5; // min "Image"
+    
+    for container in containers {
+        name_width = name_width.max(container.name.len());
+        state_width = state_width.max(container.state.to_string().len());
+        status_width = status_width.max(container.status.len());
+        image_width = image_width.max(container.image.len());
+    }
+    
+    // Add some padding
+    name_width = (name_width + 2).min(30);
+    state_width = (state_width + 2).min(12);
+    status_width = (status_width + 2).min(30);
+    image_width = (image_width + 2).min(40);
+    
+    // Fixed widths for numeric columns
+    let cpu_width = 8; // "100.00%"
+    let mem_current_width = 10; // "999.99 MB"
+    let mem_limit_width = 10; // "999.99 GB"
+    let id_width = 8; // 8 chars of ID
+    let net_width = 10; // "999.99 MB"
+    
     Columns {
-        name: (Header::Name, 20),
-        state: (Header::State, 10),
-        status: (Header::Status, 20),
-        cpu: (Header::Cpu, 6),
-        mem: (Header::Memory, 10, 10),
-        id: (Header::Id, 8),
-        image: (Header::Image, 20),
-        net_rx: (Header::Rx, 10),
-        net_tx: (Header::Tx, 10),
+        name: (Header::Name, name_width as u8),
+        state: (Header::State, state_width as u8),
+        status: (Header::Status, status_width as u8),
+        cpu: (Header::Cpu, cpu_width),
+        mem: (Header::Memory, mem_current_width, mem_limit_width),
+        id: (Header::Id, id_width),
+        image: (Header::Image, image_width as u8),
+        net_rx: (Header::Rx, net_width),
+        net_tx: (Header::Tx, net_width),
     }
 }
 
-/// Create container title based on count
-fn create_container_title(count: usize) -> String {
+/// Create container title based on count and selection
+fn create_container_title(count: usize, selected: Option<usize>) -> String {
     if count == 0 {
         "Containers".to_string()
+    } else if let Some(idx) = selected {
+        format!("Containers {}/{}", idx + 1, count)
     } else {
         format!("Containers [{}]", count)
     }

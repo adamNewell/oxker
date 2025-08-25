@@ -7,6 +7,14 @@ pub struct ContainerItem {
     pub image: String,
     pub state: String,
     pub status: String,
+    pub ports: Vec<ContainerPort>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ContainerPort {
+    pub ip: Option<String>,
+    pub private: u16,
+    pub public: Option<u16>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

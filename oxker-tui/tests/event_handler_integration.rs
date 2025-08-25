@@ -36,6 +36,7 @@ async fn test_event_handler_receives_container_list_update() {
             image: "test-image:latest".to_string(),
             state: "running".to_string(),
             status: "Up 5 minutes".to_string(),
+            ports: vec![],
         },
     ];
     
@@ -211,6 +212,7 @@ async fn test_multiple_events_processed_in_order() {
             image: "test-image:latest".to_string(),
             state: "running".to_string(),
             status: "Up 5 minutes".to_string(),
+            ports: vec![],
         },
     ];
     event_bus.publish(CoreEvent::ContainerListUpdate(containers)).await.unwrap();

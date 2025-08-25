@@ -19,29 +19,37 @@ RUN apt-get update && apt-get install $(cat /.compiler) -y
 
 WORKDIR /usr/src
 
-# Create blank project
-RUN cargo new oxker
+# Create workspace structure
+RUN mkdir -p /usr/src/oxker
 
-# We want dependencies cached, so copy those first
-COPY Cargo.* /usr/src/oxker/
+# Copy workspace configuration and crate manifests
+COPY Cargo.toml /usr/src/oxker/
+COPY oxker-core/Cargo.toml /usr/src/oxker/oxker-core/
+COPY oxker-tui/Cargo.toml /usr/src/oxker/oxker-tui/
 
 # Set the working directory
 WORKDIR /usr/src/oxker
 
+# Create dummy source files to cache dependencies
+RUN mkdir -p oxker-core/src oxker-tui/src && \
+    echo "fn main() {}" > oxker-tui/src/main.rs && \
+    echo "pub fn dummy() {}" > oxker-core/src/lib.rs
+
 # Install target platform (Cross-Compilation)
 RUN rustup target add $(cat /.target)
 
-# This is a dummy build to get the dependencies cached - probably not needed - as run via a github action
-RUN cargo build --target $(cat /.target) --release
+# This is a dummy build to get the dependencies cached
+RUN cargo build --target $(cat /.target) --release -p oxker-tui
 
-# Now copy in the rest of the sources
-COPY src /usr/src/oxker/src/
+# Now copy in the actual sources
+COPY oxker-core/src /usr/src/oxker/oxker-core/src/
+COPY oxker-tui/src /usr/src/oxker/oxker-tui/src/
 
 # Touch main.rs to prevent cached release build
-RUN touch /usr/src/oxker/src/main.rs
+RUN touch /usr/src/oxker/oxker-tui/src/main.rs
 
 # This is the actual application build
-RUN cargo build --release --target $(cat /.target)
+RUN cargo build --release --target $(cat /.target) -p oxker-tui
 
 RUN cp /usr/src/oxker/target/$(cat /.target)/release/oxker /
 
