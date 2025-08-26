@@ -5,8 +5,8 @@ use oxker_core::{
     AppColors, ByteStats, ContainerId, ContainerItem, CpuStats, RunningState, State, StatefulList,
 };
 use oxker_tui::handlers::UIContainerState;
-use oxker_tui::ui::gui_state::GuiState;
-use oxker_tui::ui::view_models::FrameViewModel;
+use oxker_tui::ui::GuiState;
+use oxker_tui::ui::FrameViewModel;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
@@ -19,7 +19,7 @@ fn create_test_container(index: u64, name: &str) -> ContainerItem {
         name.to_string(),
         vec![],
         State::Running(RunningState::Healthy),
-        oxker_core::ContainerStatus::from("Up 2 hours"),
+        oxker_core::ContainerStatus::from("Up 2 hours".to_string()),
     );
 
     // Add some CPU stats
@@ -73,7 +73,7 @@ fn main() {
     let redraw = Arc::new(oxker_tui::ui::Rerender::new());
     let gui_state = Arc::new(Mutex::new(GuiState::new(&redraw, true)));
 
-    let colors = AppColors::default();
+    let colors = AppColors::new();
 
     println!("Creating 100 FrameViewModels to simulate UI updates...");
 

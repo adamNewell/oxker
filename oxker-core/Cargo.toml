@@ -10,6 +10,7 @@ description = "Core logic for oxker - Docker TUI"
 
 [dependencies]
 anyhow.workspace = true
+async-trait = "0.1"
 bollard.workspace = true
 clap.workspace = true
 # TODO: Remove these UI dependencies after exec.rs is refactored
@@ -27,6 +28,9 @@ tokio-util.workspace = true
 toml.workspace = true
 tracing.workspace = true
 uuid.workspace = true
+
+[features]
+exec_refactor = []
 
 [lints]
 workspace = true

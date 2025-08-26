@@ -4,8 +4,8 @@ use oxker_core::{
     StatefulList,
 };
 use oxker_tui::handlers::UIContainerState;
-use oxker_tui::ui::gui_state::{GuiState, SelectablePanel};
-use oxker_tui::ui::view_models::FrameViewModel;
+use oxker_tui::ui::{GuiState, SelectablePanel};
+use oxker_tui::ui::FrameViewModel;
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -19,7 +19,7 @@ fn create_test_container(index: u64, name: &str) -> ContainerItem {
         name.to_string(),
         vec![],
         State::Running(RunningState::Healthy),
-        oxker_core::ContainerStatus::from("Up 2 hours"),
+        oxker_core::ContainerStatus::from("Up 2 hours".to_string()),
     );
 
     // Add some CPU stats
@@ -81,7 +81,7 @@ fn benchmark_frame_view_model_creation(c: &mut Criterion) {
             |b, &num_containers| {
                 let ui_state = create_ui_state_with_containers(num_containers);
                 let gui_state = create_gui_state();
-                let colors = AppColors::default();
+                let colors = AppColors::new();
 
                 b.iter(|| {
                     let ui_state_lock = ui_state.lock();
@@ -119,6 +119,7 @@ fn benchmark_container_update(c: &mut Criterion) {
                         image: format!("test/image:{}", i),
                         state: "running".to_string(),
                         status: "Up 2 hours".to_string(),
+                        ports: vec![],
                     })
                     .collect();
 
@@ -136,7 +137,7 @@ fn benchmark_container_update(c: &mut Criterion) {
 fn benchmark_lock_contention(c: &mut Criterion) {
     let ui_state = create_ui_state_with_containers(50);
     let gui_state = create_gui_state();
-    let colors = AppColors::default();
+    let colors = AppColors::new();
 
     c.bench_function("concurrent_access", |b| {
         b.iter(|| {

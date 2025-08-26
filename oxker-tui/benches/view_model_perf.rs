@@ -1,7 +1,7 @@
 use oxker_core::events::types::{ContainerItem as EventContainerItem, Stats};
 use oxker_core::{AppColors, Config, Keymap};
 use oxker_tui::handlers::UIContainerState;
-use oxker_tui::ui::view_models::FrameViewModel;
+use oxker_tui::ui::FrameViewModel;
 use oxker_tui::ui::{GuiState, Rerender};
 use parking_lot::Mutex;
 use std::sync::Arc;
@@ -42,6 +42,7 @@ fn main() {
             image: format!("test_image_{}", i),
             state: "running".to_string(),
             status: "Up 1 hour".to_string(),
+            ports: vec![],
         })
         .collect();
 

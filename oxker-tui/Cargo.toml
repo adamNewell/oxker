@@ -18,6 +18,7 @@ path = "src/main.rs"
 [dependencies]
 oxker-core = { path = "../oxker-core" }
 anyhow.workspace = true
+async-trait = "0.1"
 bollard.workspace = true
 cansi.workspace = true
 clap.workspace = true
@@ -31,6 +32,9 @@ tokio.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
 uuid.workspace = true
+
+[features]
+exec_refactor = ["oxker-core/exec_refactor"]
 
 [lints]
 workspace = true

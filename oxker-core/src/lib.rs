@@ -14,6 +14,11 @@ pub mod config;
 pub mod docker_data;
 pub mod events;
 pub mod exec;
+pub mod exec_interface;
+#[cfg(not(feature = "exec_refactor"))]
+pub mod exec_original;
+#[cfg(feature = "exec_refactor")]
+pub mod exec_refactored;
 pub mod handle;
 
 // Temporary UI stubs - TODO: Remove once proper separation is implemented
@@ -31,7 +36,12 @@ pub use app_error::AppError;
 pub use config::{AppColors, Config, Keymap};
 pub use docker_data::{DockerData, DockerMessage};
 pub use events::{CoreCommand, CoreEvent, EventBus};
+#[cfg(not(feature = "exec_refactor"))]
 pub use exec::{ExecMode, TerminalSize, tty_readable};
+#[cfg(feature = "exec_refactor")]
+pub use exec::{ExecMode, tty_readable};
+#[cfg(feature = "exec_refactor")]
+pub use exec_interface::{ExecInterface, TerminalDimensions, TerminalHandler};
 pub use handle::{CoreHandle, CoreStateView};
 
 // Constants that were in main.rs, needed by config module

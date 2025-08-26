@@ -21,6 +21,7 @@ use tokio::sync::mpsc::Sender;
 use tracing::error;
 
 mod draw_blocks;
+mod exec_integration;
 mod gui_state;
 mod redraw;
 mod view_models;
@@ -32,7 +33,7 @@ use crate::handlers::UIContainerState;
 use crate::input_handler::InputMessages;
 use oxker_core::{
     AppColors, AppData, AppError, Columns, Config, ContainerId, ContainerPorts, CpuTuple, FilterBy,
-    Header, Keymap, MemTuple, SortedOrder, State, TerminalSize,
+    Header, Keymap, MemTuple, SortedOrder, State,
 };
 
 const POLL_RATE: Duration = std::time::Duration::from_millis(50);
@@ -184,7 +185,7 @@ impl Ui {
         if let Some(mode) = exec_mode {
             self.reset_terminal().ok();
             self.terminal.clear().ok();
-            if let Err(e) = mode.run(TerminalSize::new(&self.terminal)).await {
+            if let Err(e) = exec_integration::run_exec_mode(mode, &self.terminal).await {
                 // TODO: Need to handle errors differently now that we don't have AppData
                 // For now, just update the gui_state
                 self.gui_state.lock().status_push(Status::Error);

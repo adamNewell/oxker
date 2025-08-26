@@ -9,6 +9,7 @@ fn test_event_serialization() {
         image: "nginx:latest".to_string(),
         state: "running".to_string(),
         status: "Up 5 minutes".to_string(),
+        ports: vec![],
     };
 
     let event = CoreEvent::ContainerListUpdate(vec![container]);
