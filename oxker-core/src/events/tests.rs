@@ -53,10 +53,10 @@ fn test_stats_event() {
     let stats = Stats {
         container_id: "container-123".to_string(),
         cpu_usage: 15.5,
-        memory_usage: 524288000,  // 500MB
-        memory_limit: 1073741824, // 1GB
-        network_rx: 1024000,
-        network_tx: 2048000,
+        memory_usage: 524_288_000,   // 500MB
+        memory_limit: 1_073_741_824, // 1GB
+        network_rx: 1_024_000,
+        network_tx: 2_048_000,
     };
 
     let event = CoreEvent::ContainerStatsUpdate {
@@ -73,8 +73,8 @@ fn test_stats_event() {
             stats,
         } => {
             assert_eq!(container_id, "container-123");
-            assert_eq!(stats.cpu_usage, 15.5);
-            assert_eq!(stats.memory_usage, 524288000);
+            assert!((stats.cpu_usage - 15.5).abs() < f64::EPSILON);
+            assert_eq!(stats.memory_usage, 524_288_000);
         }
         _ => panic!("Wrong event type"),
     }

@@ -34,7 +34,7 @@ tracing-subscriber.workspace = true
 uuid.workspace = true
 
 [features]
-exec_refactor = ["oxker-core/exec_refactor"]
+bench = []
 
 [lints]
 workspace = true
@@ -46,4 +46,12 @@ dhat = "0.3"
 
 [[bench]]
 name = "ui_render_bench"
+harness = false
+
+[[bench]]
+name = "panel_render_bench"
+harness = false
+
+[[bench]]
+name = "simple_panel_bench"
 harness = false

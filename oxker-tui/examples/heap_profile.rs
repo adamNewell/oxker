@@ -2,31 +2,32 @@
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
 use oxker_core::{
-    AppColors, ByteStats, ContainerId, ContainerItem, CpuStats, RunningState, State, StatefulList,
+    AppColors, ByteStats, ContainerId, ContainerItem, ContainerItemInit, CpuStats, RunningState,
+    State, StatefulList,
 };
 use oxker_tui::handlers::UIContainerState;
-use oxker_tui::ui::GuiState;
 use oxker_tui::ui::FrameViewModel;
+use oxker_tui::ui::GuiState;
 use parking_lot::Mutex;
 use std::sync::Arc;
 
 fn create_test_container(index: u64, name: &str) -> ContainerItem {
-    let mut container = ContainerItem::new(
-        index,
-        ContainerId::from(format!("container_{}", index).as_str()),
-        format!("test/image:{}", index),
-        false,
-        name.to_string(),
-        vec![],
-        State::Running(RunningState::Healthy),
-        oxker_core::ContainerStatus::from("Up 2 hours".to_string()),
-    );
+    let mut container = ContainerItem::new(ContainerItemInit {
+        created: index,
+        id: ContainerId::from(format!("container_{index}").as_str()),
+        image: format!("test/image:{index}"),
+        is_oxker: false,
+        name: name.to_string(),
+        ports: vec![],
+        state: State::Running(RunningState::Healthy),
+        status: oxker_core::ContainerStatus::from("Up 2 hours".to_string()),
+    });
 
     // Add some CPU stats
     for i in 0..60 {
         container
             .cpu_stats
-            .push_front(CpuStats::new(10.0 + (i as f64 * 0.5)));
+            .push_front(CpuStats::new(f64::from(i).mul_add(0.5, 10.0)));
     }
 
     // Add some memory stats
@@ -52,7 +53,7 @@ fn main() {
     let ui_state = Arc::new(Mutex::new(UIContainerState::new()));
 
     let containers: Vec<ContainerItem> = (0..50)
-        .map(|i| create_test_container(i as u64, &format!("container_{}", i)))
+        .map(|i| create_test_container(i as u64, &format!("container_{i}")))
         .collect();
 
     {
@@ -63,8 +64,7 @@ fn main() {
         // Add logs
         for i in 0..1000 {
             state.logs.push_back(format!(
-                "Log line {} with some content that might be quite long",
-                i
+                "Log line {i} with some content that might be quite long"
             ));
         }
     }
@@ -82,11 +82,10 @@ fn main() {
         let ui_state_lock = ui_state.lock();
         let gui_state_lock = gui_state.lock();
 
-        let _view_model =
-            FrameViewModel::from_state(&*ui_state_lock, &*gui_state_lock, colors, 200);
+        let _view_model = FrameViewModel::from_state(&ui_state_lock, &gui_state_lock, colors, 200);
 
         if i % 10 == 0 {
-            println!("Created {} view models", i);
+            println!("Created {i} view models");
         }
     }
 

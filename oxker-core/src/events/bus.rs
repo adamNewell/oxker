@@ -37,9 +37,10 @@ impl EventBus {
     ///     // Handle event
     /// }
     /// ```
+    #[must_use]
     pub fn new(buffer_size: usize) -> (Self, Receiver<CoreEvent>) {
         let (sender, receiver) = mpsc::channel(buffer_size);
-        (EventBus { sender }, receiver)
+        (Self { sender }, receiver)
     }
 
     /// Publishes an event to all subscribers asynchronously.
@@ -61,11 +62,15 @@ impl EventBus {
     ///     eprintln!("Failed to publish event: {}", e);
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event channel is closed or the send operation fails.
     pub async fn publish(&self, event: CoreEvent) -> Result<(), String> {
         debug!("Publishing event: {:?}", event);
         self.sender.send(event).await.map_err(|e| {
             error!("Failed to send event: {}", e);
-            format!("Failed to send event: {}", e)
+            format!("Failed to send event: {e}")
         })
     }
 
@@ -73,6 +78,10 @@ impl EventBus {
     ///
     /// Note: This returns an error as the current design provides the receiver
     /// directly from `new()`. This method exists for API compatibility.
+    ///
+    /// # Errors
+    ///
+    /// Always returns an error as subscription is not supported in the current design
     pub fn subscribe(&self) -> Result<Receiver<CoreEvent>, String> {
         Err("subscribe() is not supported - use the receiver from new() instead".to_string())
     }
@@ -115,7 +124,7 @@ mod tests {
             match (expected, received) {
                 (CoreEvent::Error(e1), CoreEvent::Error(e2)) => assert_eq!(e1, e2),
                 (CoreEvent::ContainerRemoved(c1), CoreEvent::ContainerRemoved(c2)) => {
-                    assert_eq!(c1, c2)
+                    assert_eq!(c1, c2);
                 }
                 _ => panic!("Event mismatch"),
             }

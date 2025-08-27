@@ -5,13 +5,8 @@ use crossterm::{
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use parking_lot::Mutex;
-use ratatui::{
-    Frame, Terminal,
-    backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Position},
-};
+use ratatui::{Frame, Terminal, backend::CrosstermBackend, layout::Position};
 use std::{
-    collections::HashSet,
     io::{self, Stdout, Write},
     sync::{Arc, atomic::Ordering},
     time::Duration,
@@ -20,21 +15,23 @@ use std::{sync::atomic::AtomicBool, time::Instant};
 use tokio::sync::mpsc::Sender;
 use tracing::error;
 
-mod draw_blocks;
+// draw_blocks module removed - functionality migrated to components
 mod exec_integration;
 mod gui_state;
 mod redraw;
 mod view_models;
+
+// Component-based architecture
+pub mod components;
+pub mod views;
+
 pub use redraw::Rerender;
 pub use view_models::{ChartData, CommandsView, ContainerView, FrameViewModel, LogView, PortView};
 
 pub use self::gui_state::{DeleteButton, GuiState, SelectablePanel, Status};
 use crate::handlers::UIContainerState;
 use crate::input_handler::InputMessages;
-use oxker_core::{
-    AppColors, AppData, AppError, Columns, Config, ContainerId, ContainerPorts, CpuTuple, FilterBy,
-    Header, Keymap, MemTuple, SortedOrder, State,
-};
+use oxker_core::{AppColors, AppError, Config, Keymap};
 
 const POLL_RATE: Duration = std::time::Duration::from_millis(50);
 
@@ -55,6 +52,10 @@ pub struct Ui {
 
 impl Ui {
     /// Enable mouse capture, but don't enable capture of all the mouse movements, doing so will improve performance, and is part of the fix for the weird mouse event output bug
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to stdout fails
     pub fn enable_mouse_capture() -> Result<()> {
         Ok(io::stdout().write_all(
             concat!(
@@ -119,6 +120,10 @@ impl Ui {
     }
 
     /// reset the terminal back to default settings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if terminal operations fail
     pub fn reset_terminal(&mut self) -> Result<()> {
         self.terminal.clear()?;
 
@@ -153,13 +158,18 @@ impl Ui {
                 && self
                     .terminal
                     .draw(|f| {
-                        draw_blocks::error::draw(
-                            colors,
-                            &AppError::DockerConnect,
-                            f,
-                            &keymap,
-                            Some(seconds),
-                        );
+                        use components::{
+                            Component,
+                            panels::error::{ErrorPanel, ErrorPanelProps},
+                        };
+                        let error_panel = ErrorPanel::new();
+                        let props = ErrorPanelProps {
+                            error: &AppError::DockerConnect,
+                            theme: &colors,
+                            keymap: &keymap,
+                            auto_close_seconds: Some(seconds),
+                        };
+                        error_panel.render(&props, f.area(), f);
                     })
                     .is_err()
             {
@@ -185,7 +195,7 @@ impl Ui {
         if let Some(mode) = exec_mode {
             self.reset_terminal().ok();
             self.terminal.clear().ok();
-            if let Err(e) = exec_integration::run_exec_mode(mode, &self.terminal).await {
+            if let Err(_e) = exec_integration::run_exec_mode(mode, &self.terminal).await {
                 // TODO: Need to handle errors differently now that we don't have AppData
                 // For now, just update the gui_state
                 self.gui_state.lock().status_push(Status::Error);
@@ -200,12 +210,19 @@ impl Ui {
     /// Use the previously redrawn time, the current time, the docker_interval, and the redraw struct, to calculate
     /// if the screen should be redrawn or not
     fn should_redraw(&self, previous: &mut Instant, docker_interval_ms: u128) -> bool {
-        let result =
-            self.rerender.swap_draw() || previous.elapsed().as_millis() >= docker_interval_ms;
-        if result {
+        // Check if immediate redraw is requested
+        if self.rerender.swap_draw() {
             *previous = std::time::Instant::now();
+            return true;
         }
-        result
+
+        // Otherwise check if enough time has passed for docker update
+        if previous.elapsed().as_millis() >= docker_interval_ms {
+            *previous = std::time::Instant::now();
+            return true;
+        }
+
+        false
     }
 
     /// The loop for drawing the main UI to the terminal
@@ -236,8 +253,8 @@ impl Ui {
                 if needs_update {
                     let mut ui_state = self.container_state.lock();
                     self.cached_view_model = Some(FrameViewModel::from_state(
-                        &*ui_state,
-                        &*self.gui_state.lock(),
+                        &ui_state,
+                        &self.gui_state.lock(),
                         colors,
                         screen_width,
                     ));
@@ -269,34 +286,34 @@ impl Ui {
                 }
             }
 
-            if crossterm::event::poll(POLL_RATE).unwrap_or(false) {
-                if let Ok(event) = event::read() {
-                    if let Event::Key(key) = event {
-                        if key.kind == event::KeyEventKind::Press {
+            if crossterm::event::poll(POLL_RATE).unwrap_or(false)
+                && let Ok(event) = event::read()
+            {
+                if let Event::Key(key) = event {
+                    if key.kind == event::KeyEventKind::Press {
+                        self.input_tx
+                            .send(InputMessages::ButtonPress((key.code, key.modifiers)))
+                            .await
+                            .ok();
+                    }
+                } else if let Event::Mouse(m) = event {
+                    match m.kind {
+                        event::MouseEventKind::Down(_)
+                        | event::MouseEventKind::ScrollDown
+                        | event::MouseEventKind::ScrollUp => {
                             self.input_tx
-                                .send(InputMessages::ButtonPress((key.code, key.modifiers)))
+                                .send(InputMessages::MouseEvent((m, m.modifiers)))
                                 .await
                                 .ok();
                         }
-                    } else if let Event::Mouse(m) = event {
-                        match m.kind {
-                            event::MouseEventKind::Down(_)
-                            | event::MouseEventKind::ScrollDown
-                            | event::MouseEventKind::ScrollUp => {
-                                self.input_tx
-                                    .send(InputMessages::MouseEvent((m, m.modifiers)))
-                                    .await
-                                    .ok();
-                            }
-                            _ => (),
-                        }
-                    } else if let Event::Resize(width, _) = event {
-                        self.gui_state.lock().clear_area_map();
-                        self.terminal.autoresize().ok();
-                        self.gui_state.lock().set_screen_width(width);
-                        // Invalidate cached view model on resize
-                        self.cached_view_model = None;
+                        _ => (),
                     }
+                } else if let Event::Resize(width, _) = event {
+                    self.gui_state.lock().clear_area_map();
+                    self.terminal.autoresize().ok();
+                    self.gui_state.lock().set_screen_width(width);
+                    // Invalidate cached view model on resize
+                    self.cached_view_model = None;
                 }
             }
             self.check_clear();
@@ -320,127 +337,15 @@ impl Ui {
 fn draw_frame(
     container_state: &Arc<Mutex<UIContainerState>>,
     config: &Config,
-    colors: AppColors,
+    _colors: AppColors,
     keymap: &Keymap,
     f: &mut Frame,
     fd: &FrameViewModel,
     gui_state: &Arc<Mutex<GuiState>>,
 ) {
-    let whole_layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(if fd.status.contains(&Status::Filter) {
-            vec![Constraint::Max(1), Constraint::Min(1), Constraint::Max(1)]
-        } else {
-            vec![Constraint::Max(1), Constraint::Min(1)]
-        })
-        .split(f.area());
-
-    draw_blocks::headers::draw(whole_layout[0], colors, f, fd, gui_state, keymap);
-
-    // If required, draw filter bar
-    if let Some(rect) = whole_layout.get(2) {
-        draw_blocks::filter::draw(*rect, colors, f, fd);
-    }
-
-    let upper_main = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(if fd.has_containers {
-            vec![Constraint::Percentage(75), Constraint::Percentage(25)]
-        } else {
-            vec![Constraint::Percentage(100), Constraint::Percentage(0)]
-        })
-        .split(whole_layout[1]);
-
-    let containers_logs_section = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(if fd.show_logs {
-            vec![Constraint::Min(6), Constraint::Percentage(fd.log_height)]
-        } else {
-            vec![Constraint::Percentage(100)]
-        })
-        .split(upper_main[0]);
-
-    // Containers + docker commands
-    let containers_commands = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints(if fd.has_containers {
-            vec![Constraint::Percentage(90), Constraint::Percentage(10)]
-        } else {
-            vec![Constraint::Percentage(100)]
-        })
-        .split(containers_logs_section[0]);
-
-    draw_blocks::containers::draw(
-        container_state,
-        containers_commands[0],
-        colors,
-        f,
-        fd,
-        gui_state,
-    );
-
-    if fd.show_logs {
-        draw_blocks::logs::draw(
-            container_state,
-            containers_logs_section[1],
-            colors,
-            f,
-            fd,
-            gui_state,
-        );
-    }
-
-    if let Some(id) = fd.delete_confirm.as_ref() {
-        // Find container name from UIContainerState
-        let container_name = container_state
-            .lock()
-            .get_container_items()
-            .iter()
-            .find(|c| &c.id == id)
-            .map(|c| c.name.clone());
-
-        if let Some(name) = container_name {
-            draw_blocks::delete_confirm::draw(colors, f, gui_state, keymap, &name);
-        } else {
-            // If a container is deleted outside of oxker but whilst the Delete Confirm dialog is open, it can get caught in kind of a dead lock situation
-            // so if in that unique situation, just clear the delete_container id
-            gui_state.lock().set_delete_container(None);
-        }
-    }
-
-    // only draw commands + charts if there are containers
-    if let Some(rect) = containers_commands.get(1) {
-        draw_blocks::commands::draw(container_state, *rect, colors, f, fd, gui_state);
-
-        // Dynamic ports panel width: IP(min 2, max 16) + 3 spaces + Private(7) + 2 spaces + Public(7) + 2 borders
-        let ports_len = if let Some(port_view) = &fd.port_view {
-            let ip_width = port_view.max_lens.0.max(2).min(16);
-            // ip_width + 3 + 7 + 2 + 7 + 2 borders
-            u16::try_from(ip_width + 3 + 7 + 2 + 7 + 2).unwrap_or(37)
-        } else {
-            23 // Minimum width: 2 + 3 + 7 + 2 + 7 + 2 = 23
-        };
-
-        let lower = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(1), Constraint::Max(ports_len)])
-            .split(upper_main[1]);
-
-        draw_blocks::charts::draw(lower[0], colors, f, fd);
-        draw_blocks::ports::draw(lower[1], colors, f, fd);
-    }
-
-    if let Some((text, instant)) = fd.info_text.as_ref() {
-        draw_blocks::info::draw(colors, f, gui_state, instant, text.to_owned());
-    }
-
-    // Check if error, and show popup if so
-    if fd.status.contains(&Status::Help) {
-        let tz = config.timezone.clone();
-        draw_blocks::help::draw(colors, f, keymap, config.show_timestamp, tz.as_ref());
-    }
-
-    if let Some(error) = fd.has_error.as_ref() {
-        draw_blocks::error::draw(colors, error, f, keymap, None);
-    }
+    // Use the component-based MainView
+    use views::{View, main_view::MainView};
+    // TODO: Consider caching MainView instance to avoid recreation
+    let main_view = MainView::new(config, keymap, gui_state, container_state);
+    main_view.render(fd, f);
 }

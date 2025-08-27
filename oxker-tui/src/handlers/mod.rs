@@ -1,5 +1,4 @@
 mod docker_events;
-#[cfg(feature = "exec_refactor")]
 pub mod exec_handler;
 mod ui_state;
 

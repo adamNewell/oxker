@@ -15,32 +15,19 @@ pub mod docker_data;
 pub mod events;
 pub mod exec;
 pub mod exec_interface;
-#[cfg(not(feature = "exec_refactor"))]
-pub mod exec_original;
-#[cfg(feature = "exec_refactor")]
-pub mod exec_refactored;
 pub mod handle;
-
-// Temporary UI stubs - TODO: Remove once proper separation is implemented
-mod ui_stub;
-#[allow(unused_imports)]
-use ui_stub as ui;
 
 // Re-exports for public API
 pub use app_data::{
-    AppData, ByteStats, Columns, ContainerId, ContainerImage, ContainerItem, ContainerName,
-    ContainerPorts, ContainerStatus, CpuStats, CpuTuple, DockerCommand, Filter, FilterBy, Header,
-    MemTuple, RunningState, SortedOrder, State, StatefulList, Stats,
+    AppData, ByteStats, Columns, ContainerId, ContainerImage, ContainerItem, ContainerItemInit,
+    ContainerName, ContainerPorts, ContainerStatus, CpuStats, CpuTuple, DockerCommand, Filter,
+    FilterBy, Header, MemTuple, RunningState, SortedOrder, State, StatefulList, Stats,
 };
 pub use app_error::AppError;
 pub use config::{AppColors, Config, Keymap};
 pub use docker_data::{DockerData, DockerMessage};
 pub use events::{CoreCommand, CoreEvent, EventBus};
-#[cfg(not(feature = "exec_refactor"))]
-pub use exec::{ExecMode, TerminalSize, tty_readable};
-#[cfg(feature = "exec_refactor")]
 pub use exec::{ExecMode, tty_readable};
-#[cfg(feature = "exec_refactor")]
 pub use exec_interface::{ExecInterface, TerminalDimensions, TerminalHandler};
 pub use handle::{CoreHandle, CoreStateView};
 
@@ -58,6 +45,7 @@ pub mod tests {
     use std::sync::Arc;
 
     /// Default test config, has timestamps turned off
+    #[must_use]
     pub fn gen_config() -> Config {
         Config {
             color_logs: false,
@@ -79,31 +67,38 @@ pub mod tests {
         }
     }
 
+    /// Generate a test container item
+    ///
+    /// # Panics
+    ///
+    /// Panics if index cannot be converted to u64
+    #[must_use]
     pub fn gen_item(id: &ContainerId, index: usize) -> ContainerItem {
-        ContainerItem::new(
-            u64::try_from(index).unwrap(),
-            id.clone(),
-            format!("image_{index}"),
-            false,
-            format!("container_{index}"),
-            vec![ContainerPorts {
+        ContainerItem::new(ContainerItemInit {
+            created: u64::try_from(index).unwrap(),
+            id: id.clone(),
+            image: format!("image_{index}"),
+            is_oxker: false,
+            name: format!("container_{index}"),
+            ports: vec![ContainerPorts {
                 ip: None,
                 private: u16::try_from(index).unwrap_or(1) + 8000,
                 public: Some(u16::try_from(index).unwrap_or(1) + 9000),
             }],
-            State::Running(RunningState::Healthy),
-            ContainerStatus::from("Up 1 hour".to_owned()),
-        )
+            state: State::Running(RunningState::Healthy),
+            status: ContainerStatus::from("Up 1 hour".to_owned()),
+        })
     }
 
+    #[must_use]
     pub fn gen_containers() -> (Vec<ContainerId>, Vec<ContainerItem>) {
         gen_containers_n(3)
     }
 
+    #[must_use]
     pub fn gen_containers_n(n: usize) -> (Vec<ContainerId>, Vec<ContainerItem>) {
         let mut ids = Vec::new();
         let items = (1..=n)
-            .into_iter()
             .map(|index| {
                 let id = ContainerId::from(format!("{index}").as_str());
                 ids.push(id.clone());
@@ -113,11 +108,13 @@ pub mod tests {
         (ids, items)
     }
 
+    #[must_use]
     pub fn gen_appdata(n: usize) -> AppData {
         let (_ids, containers) = gen_containers_n(n);
         gen_appdata_with_containers(&containers)
     }
 
+    #[must_use]
     pub fn gen_appdata_with_containers(containers: &[ContainerItem]) -> AppData {
         let (event_bus, _receiver) = EventBus::new(100);
         let event_bus = Arc::new(event_bus);
@@ -126,6 +123,7 @@ pub mod tests {
         app_data
     }
 
+    #[must_use]
     pub fn gen_container_summary(index: u8, state_str: &str) -> ContainerSummary {
         let id = Some(index.to_string());
         let names = id.as_ref().map(|id| vec![format!("/{id}_container_name")]);

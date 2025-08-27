@@ -1,4 +1,3 @@
-#![allow(clippy::collapsible_if)]
 // Zigbuild is stuck on 1.87.0, which means Mac builds won't work when using collapsible ifs
 #![forbid(unsafe_code)]
 
@@ -16,7 +15,7 @@ use tracing::{Level, error, info};
 use oxker_core::{Config, CoreHandle, EventBus};
 
 use oxker_tui::handlers::UIEventHandler;
-use oxker_tui::ui::{GuiState, Rerender, Status, Ui};
+use oxker_tui::ui::{GuiState, Rerender, Ui};
 
 /// Enable tracing, only really used in debug mode, for now
 /// write to file if `-g` is set?
@@ -43,7 +42,7 @@ fn cleanup_terminal() {
 }
 
 /// Initialize CoreHandle which manages Docker connection internally
-async fn core_init(event_bus: EventBus, config: Config) -> CoreHandle {
+fn core_init(event_bus: EventBus, config: &Config) -> CoreHandle {
     CoreHandle::new(event_bus, config)
 }
 
@@ -80,7 +79,7 @@ async fn main() {
         );
 
         // Print panic info
-        eprintln!("Application panicked: {}", panic_info);
+        eprintln!("Application panicked: {panic_info}");
     }));
     let config = Config::new();
     let redraw = Arc::new(Rerender::new());
@@ -89,7 +88,7 @@ async fn main() {
     let (event_bus, receiver) = EventBus::new(100);
 
     // Initialize CoreHandle with Docker connection
-    let core_handle = core_init(event_bus, config.clone()).await;
+    let core_handle = core_init(event_bus, &config);
 
     let gui_state = Arc::new(Mutex::new(GuiState::new(&redraw, config.show_logs)));
     let is_running = Arc::new(AtomicBool::new(true));
@@ -129,15 +128,15 @@ async fn main() {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         // Trigger log refresh for the initially selected container
-        if let Some(container_id) = container_state.lock().get_selected_container_id() {
-            if let Err(e) = core_handle
+        let container_id = container_state.lock().get_selected_container_id();
+        if let Some(container_id) = container_id
+            && let Err(e) = core_handle
                 .execute_command(oxker_core::CoreCommand::RefreshLogs(
                     container_id.get().to_string(),
                 ))
                 .await
-            {
-                error!("Failed to refresh logs on startup: {}", e);
-            }
+        {
+            error!("Failed to refresh logs on startup: {}", e);
         }
 
         // Pass container state and config to UI
@@ -193,7 +192,6 @@ async fn main() {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 pub mod tests {
 
     use std::{str::FromStr, sync::Arc};
@@ -201,12 +199,12 @@ pub mod tests {
     use bollard::service::{ContainerSummary, Port};
 
     use oxker_core::{
-        AppColors, AppData, Config, ContainerId, ContainerItem, ContainerPorts, ContainerStatus,
-        Filter, Keymap, RunningState, State, StatefulList,
+        AppColors, AppData, Config, ContainerId, ContainerItem, ContainerItemInit, ContainerPorts,
+        ContainerStatus, Keymap, RunningState, State,
     };
-    use oxker_tui::ui::Rerender;
 
     /// Default test config, has timestamps turned off
+    #[must_use]
     pub fn gen_config() -> Config {
         Config {
             app_colors: AppColors::new(),
@@ -228,32 +226,35 @@ pub mod tests {
         }
     }
 
+    #[must_use]
     pub fn gen_item(id: &ContainerId, index: usize) -> ContainerItem {
-        ContainerItem::new(
-            u64::try_from(index).unwrap(),
-            id.clone(),
-            format!("image_{index}"),
-            false,
-            format!("container_{index}"),
-            vec![ContainerPorts {
+        ContainerItem::new(ContainerItemInit {
+            created: u64::try_from(index).unwrap(),
+            id: id.clone(),
+            image: format!("image_{index}"),
+            is_oxker: false,
+            name: format!("container_{index}"),
+            ports: vec![ContainerPorts {
                 ip: None,
                 private: u16::try_from(index).unwrap_or(1) + 8000,
                 public: None,
             }],
-            State::Running(RunningState::Healthy),
-            ContainerStatus::from(format!("Up {index} hour")),
-        )
+            state: State::Running(RunningState::Healthy),
+            status: ContainerStatus::from(format!("Up {index} hour")),
+        })
     }
 
-    pub fn gen_appdata(containers: &[ContainerItem]) -> AppData {
+    #[must_use]
+    pub fn gen_appdata(_containers: &[ContainerItem]) -> AppData {
         let config = gen_config();
         let event_bus = Arc::new(oxker_core::EventBus::new(10).0);
-        let mut app_data = AppData::new(config, event_bus);
+
         // Note: We can't directly set containers since it's private
         // Tests will need to be refactored to use CoreHandle instead
-        app_data
+        AppData::new(config, event_bus)
     }
 
+    #[must_use]
     pub fn gen_containers() -> (Vec<ContainerId>, Vec<ContainerItem>) {
         let id1 = ContainerId::from("1");
         let id2 = ContainerId::from("2");
@@ -264,6 +265,7 @@ pub mod tests {
         (vec![id1, id2, id3], containers)
     }
 
+    #[must_use]
     pub fn gen_container_summary(index: usize, state: &str) -> ContainerSummary {
         ContainerSummary {
             image_manifest_descriptor: None,

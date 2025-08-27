@@ -29,6 +29,7 @@ impl UIEventHandler {
     }
 
     /// Get a reference to the container state for UI components
+    #[must_use]
     pub fn get_container_state(&self) -> Arc<Mutex<UIContainerState>> {
         Arc::clone(&self.container_state)
     }
@@ -47,16 +48,16 @@ impl UIEventHandler {
                     container_id,
                     stats,
                 } => {
-                    self.handle_container_stats_update(container_id, stats);
+                    self.handle_container_stats_update(&container_id, &stats);
                 }
                 CoreEvent::ContainerLogsUpdate { container_id, logs } => {
-                    self.handle_logs_received(container_id, logs);
+                    self.handle_logs_received(&container_id, logs);
                 }
                 CoreEvent::ContainerRemoved(container_id) => {
-                    self.handle_container_removed(container_id);
+                    self.handle_container_removed(&container_id);
                 }
                 CoreEvent::Error(error_msg) => {
-                    self.handle_error_occurred(error_msg);
+                    self.handle_error_occurred(&error_msg);
                 }
                 CoreEvent::ContainerListUpdated => {
                     debug!("Container list updated notification");
@@ -122,7 +123,7 @@ impl UIEventHandler {
         self.rerender.update_draw();
     }
 
-    fn handle_container_stats_update(&self, container_id: String, stats: Stats) {
+    fn handle_container_stats_update(&self, container_id: &str, stats: &Stats) {
         debug!("Updating stats for container {}", container_id);
 
         // Update container stats
@@ -135,7 +136,7 @@ impl UIEventHandler {
         self.rerender.update_draw();
     }
 
-    fn handle_logs_received(&self, container_id: String, logs: Vec<LogLine>) {
+    fn handle_logs_received(&self, container_id: &str, logs: Vec<LogLine>) {
         debug!(
             "Received {} log lines for container {}",
             logs.len(),
@@ -158,7 +159,7 @@ impl UIEventHandler {
         self.rerender.update_draw();
     }
 
-    fn handle_container_removed(&self, container_id: String) {
+    fn handle_container_removed(&self, container_id: &str) {
         debug!("Removing container {}", container_id);
 
         // Remove container from state
@@ -178,7 +179,7 @@ impl UIEventHandler {
         self.rerender.update_draw();
     }
 
-    fn handle_error_occurred(&self, error_msg: String) {
+    fn handle_error_occurred(&self, error_msg: &str) {
         error!("Error occurred: {}", error_msg);
 
         // Set error state

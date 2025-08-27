@@ -1,32 +1,33 @@
+#![allow(clippy::unwrap_used)]
+
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use oxker_core::{
-    AppColors, ByteStats, ContainerId, ContainerItem, CpuStats, DockerCommand, RunningState, State,
-    StatefulList,
+    AppColors, ByteStats, ContainerId, ContainerItem, ContainerItemInit, CpuStats, RunningState,
+    State, StatefulList,
 };
 use oxker_tui::handlers::UIContainerState;
-use oxker_tui::ui::{GuiState, SelectablePanel};
 use oxker_tui::ui::FrameViewModel;
+use oxker_tui::ui::GuiState;
 use parking_lot::Mutex;
-use std::collections::VecDeque;
 use std::sync::Arc;
 
 fn create_test_container(index: u64, name: &str) -> ContainerItem {
-    let mut container = ContainerItem::new(
-        index,
-        ContainerId::from(format!("container_{}", index).as_str()),
-        format!("test/image:{}", index),
-        false,
-        name.to_string(),
-        vec![],
-        State::Running(RunningState::Healthy),
-        oxker_core::ContainerStatus::from("Up 2 hours".to_string()),
-    );
+    let mut container = ContainerItem::new(ContainerItemInit {
+        created: index,
+        id: ContainerId::from(format!("container_{index}").as_str()),
+        image: format!("test/image:{index}"),
+        is_oxker: false,
+        name: name.to_string(),
+        ports: vec![],
+        state: State::Running(RunningState::Healthy),
+        status: oxker_core::ContainerStatus::from("Up 2 hours".to_string()),
+    });
 
     // Add some CPU stats
     for i in 0..60 {
         container
             .cpu_stats
-            .push_front(CpuStats::new(10.0 + (i as f64 * 0.5)));
+            .push_front(CpuStats::new(f64::from(i).mul_add(0.5, 10.0)));
     }
 
     // Add some memory stats
@@ -47,7 +48,7 @@ fn create_ui_state_with_containers(num_containers: usize) -> Arc<Mutex<UIContain
     let ui_state = Arc::new(Mutex::new(UIContainerState::new()));
 
     let containers: Vec<ContainerItem> = (0..num_containers)
-        .map(|i| create_test_container(i as u64, &format!("container_{}", i)))
+        .map(|i| create_test_container(i as u64, &format!("container_{i}")))
         .collect();
 
     {
@@ -59,7 +60,7 @@ fn create_ui_state_with_containers(num_containers: usize) -> Arc<Mutex<UIContain
         for i in 0..100 {
             state
                 .logs
-                .push_back(format!("Log line {} with some content", i));
+                .push_back(format!("Log line {i} with some content"));
         }
     }
 
@@ -74,7 +75,7 @@ fn create_gui_state() -> Arc<Mutex<GuiState>> {
 fn benchmark_frame_view_model_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("FrameViewModel Creation");
 
-    for num_containers in [1, 10, 50, 100].iter() {
+    for num_containers in &[1, 10, 50, 100] {
         group.bench_with_input(
             BenchmarkId::from_parameter(num_containers),
             num_containers,
@@ -88,8 +89,8 @@ fn benchmark_frame_view_model_creation(c: &mut Criterion) {
                     let gui_state_lock = gui_state.lock();
 
                     black_box(FrameViewModel::from_state(
-                        &*ui_state_lock,
-                        &*gui_state_lock,
+                        &ui_state_lock,
+                        &gui_state_lock,
                         colors,
                         200, // screen width
                     ))
@@ -104,7 +105,7 @@ fn benchmark_frame_view_model_creation(c: &mut Criterion) {
 fn benchmark_container_update(c: &mut Criterion) {
     let mut group = c.benchmark_group("Container Update");
 
-    for num_containers in [10, 50, 100].iter() {
+    for num_containers in &[10, 50, 100] {
         group.bench_with_input(
             BenchmarkId::from_parameter(num_containers),
             num_containers,
@@ -114,9 +115,9 @@ fn benchmark_container_update(c: &mut Criterion) {
                 // Create event containers
                 let event_containers: Vec<_> = (0..num_containers)
                     .map(|i| oxker_core::events::types::ContainerItem {
-                        id: format!("container_{}", i),
-                        name: format!("container_{}", i),
-                        image: format!("test/image:{}", i),
+                        id: format!("container_{i}"),
+                        name: format!("container_{i}"),
+                        image: format!("test/image:{i}"),
                         state: "running".to_string(),
                         status: "Up 2 hours".to_string(),
                         ports: vec![],
@@ -154,7 +155,7 @@ fn benchmark_lock_contention(c: &mut Criterion) {
                                 let ui_lock = ui_state.lock();
                                 let gui_lock = gui_state.lock();
                                 let _ = black_box(FrameViewModel::from_state(
-                                    &*ui_lock, &*gui_lock, colors, 200,
+                                    &ui_lock, &gui_lock, colors, 200,
                                 ));
                             } else {
                                 // Writer thread

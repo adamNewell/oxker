@@ -8,16 +8,12 @@ use std::{
 };
 
 mod container_state;
+pub use container_state::ContainerItemInit;
 
-use crate::{
-    ENTRY_POINT,
-    app_error::AppError,
-    config::Config,
-    events::{
-        CoreEvent, EventBus,
-        types::{ContainerItem as EventContainerItem, ContainerPort as EventContainerPort},
-    },
-};
+use crate::{ENTRY_POINT, app_error::AppError, config::Config, events::EventBus};
+
+#[cfg(not(test))]
+use crate::events::CoreEvent;
 pub use container_state::*;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -53,7 +49,7 @@ impl fmt::Display for Header {
             Self::Rx => "↓ rx",
             Self::Tx => "↑ tx",
         };
-        write!(f, "{disp:>x$}", x = f.width().unwrap_or(1))
+        write!(f, "{disp}")
     }
 }
 
@@ -107,7 +103,15 @@ pub struct Filter {
     pub term: Option<String>,
     pub by: FilterBy,
 }
+
+impl Default for Filter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Filter {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             term: None,
@@ -145,6 +149,7 @@ pub struct AppData {
 
 impl AppData {
     /// Generate a default app_state
+    #[must_use]
     pub fn new(config: Config, event_bus: Arc<EventBus>) -> Self {
         Self {
             config,
@@ -158,50 +163,17 @@ impl AppData {
         }
     }
 
-    /// Helper to emit container list update events
-    async fn emit_container_update(&self) {
-        let containers: Vec<EventContainerItem> = self
-            .containers
-            .items
-            .iter()
-            .map(|c| EventContainerItem {
-                id: c.id.get().to_string(),
-                name: c.name.get().to_string(),
-                image: c.image.to_string(),
-                state: c.state.as_str().to_string(),
-                status: c.status.to_string(),
-                ports: c
-                    .ports
-                    .iter()
-                    .map(|p| EventContainerPort {
-                        ip: p.ip.map(|ip| ip.to_string()),
-                        private: p.private,
-                        public: p.public,
-                    })
-                    .collect(),
-            })
-            .collect();
-
-        if let Err(e) = self
-            .event_bus
-            .publish(CoreEvent::ContainerListUpdate(containers))
-            .await
-        {
-            eprintln!("Failed to publish container update event: {}", e);
-        }
-    }
-
     /// Current time as unix timestamp
-    #[allow(clippy::expect_used)]
     fn get_systemtime() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .expect("In our known reality, this error should never occur")
+            .unwrap_or_else(|_| std::time::Duration::from_secs(0))
             .as_secs()
     }
 
     /// Filter related methods
     /// Get the filterby and filter_term
+    #[must_use]
     pub const fn get_filter(&self) -> (FilterBy, Option<&String>) {
         (self.filter.by, self.filter.term.as_ref())
     }
@@ -263,7 +235,7 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus.publish(CoreEvent::ContainerListUpdated).await;
+                let _ = event_bus.publish(CoreEvent::ContainerListUpdated).await;
             });
         }
     }
@@ -346,17 +318,18 @@ impl AppData {
     /// Sort containers based on a given header, if headings match, and already ascending, remove sorting
     pub fn set_sort_by_header(&mut self, selected_header: Header) {
         let mut output = Some((selected_header, SortedOrder::Asc));
-        if let Some((current_header, order)) = self.get_sorted() {
-            if current_header == selected_header {
-                match order {
-                    SortedOrder::Desc => output = None,
-                    SortedOrder::Asc => output = Some((selected_header, SortedOrder::Desc)),
-                }
+        if let Some((current_header, order)) = self.get_sorted()
+            && current_header == selected_header
+        {
+            match order {
+                SortedOrder::Desc => output = None,
+                SortedOrder::Asc => output = Some((selected_header, SortedOrder::Desc)),
             }
         }
         self.set_sorted(output);
     }
 
+    #[must_use]
     pub const fn get_sorted(&self) -> Option<(Header, SortedOrder)> {
         self.sorted_by
     }
@@ -372,6 +345,7 @@ impl AppData {
     /// Sort the containers vec, based on a heading (and if clash, then by name), either ascending or descending,
     /// If not sort set, then sort by created time
     pub fn sort_containers(&mut self) {
+        #[cfg(not(test))]
         let pre_order = self.get_current_ids();
 
         if let Some((head, ord)) = self.sorted_by {
@@ -450,17 +424,19 @@ impl AppData {
         if pre_order != self.get_current_ids() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus.publish(CoreEvent::ContainerListUpdated).await;
+                let _ = event_bus.publish(CoreEvent::ContainerListUpdated).await;
             });
         }
     }
 
     /// Container state methods
     /// Get the total number of none "hidden" containers
+    #[must_use]
     pub const fn get_container_len(&self) -> usize {
         self.containers.items.len()
     }
 
+    #[must_use]
     pub fn get_all_id_state(&self) -> Vec<(State, ContainerId)> {
         self.containers
             .items
@@ -471,12 +447,13 @@ impl AppData {
 
     /// Get all the ContainerItems
     /// Thnk this allow block can be removed with the 1.87 release of Clippy
-    #[allow(clippy::missing_const_for_fn)]
+    #[must_use]
     pub fn get_container_items(&self) -> &[ContainerItem] {
         &self.containers.items
     }
 
     /// Get title for containers section, add a suffix indicating if the containers are currently under filter
+    #[must_use]
     pub fn get_container_title(&self) -> String {
         let suffix = if !self.hidden_containers.is_empty() && !self.containers.items.is_empty() {
             " - filtered"
@@ -487,13 +464,14 @@ impl AppData {
     }
 
     /// Select the first container
+    #[allow(clippy::missing_const_for_fn)]
     pub fn containers_start(&mut self) {
         self.containers.start();
         #[cfg(not(test))]
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus
+                let _ = event_bus
                     .publish(CoreEvent::ContainerSelectionChanged)
                     .await;
             });
@@ -501,13 +479,14 @@ impl AppData {
     }
 
     /// select the last container
+    #[allow(clippy::missing_const_for_fn)]
     pub fn containers_end(&mut self) {
         self.containers.end();
         #[cfg(not(test))]
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus
+                let _ = event_bus
                     .publish(CoreEvent::ContainerSelectionChanged)
                     .await;
             });
@@ -521,7 +500,7 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus
+                let _ = event_bus
                     .publish(CoreEvent::ContainerSelectionChanged)
                     .await;
             });
@@ -535,7 +514,7 @@ impl AppData {
         {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
-                event_bus
+                let _ = event_bus
                     .publish(CoreEvent::ContainerSelectionChanged)
                     .await;
             });
@@ -548,6 +527,7 @@ impl AppData {
     }
 
     /// Get Option of the current selected container
+    #[must_use]
     pub fn get_selected_container(&self) -> Option<&ContainerItem> {
         self.containers
             .state
@@ -589,6 +569,7 @@ impl AppData {
     }
 
     /// Get Option of the current selected container's ports, sorted by private port
+    #[must_use]
     pub fn get_selected_ports(&self) -> Option<(Vec<ContainerPorts>, State)> {
         if let Some(item) = self.get_selected_container() {
             let mut ports = item.ports.clone();
@@ -628,16 +609,19 @@ impl AppData {
     /// Find the id of the currently selected container.
     /// If any containers on system, will always return a ContainerId
     /// Only returns None when no containers found.
+    #[must_use]
     pub fn get_selected_container_id(&self) -> Option<ContainerId> {
         self.get_selected_container().map(|i| i.id.clone())
     }
 
     /// Check if a given ID matches the currently selected container
+    #[must_use]
     pub fn is_selected_container(&self, id: &ContainerId) -> bool {
         self.get_selected_container().is_some_and(|i| &i.id == id)
     }
 
     /// Get the Id and State for the currently selected container - used by the exec check method
+    #[must_use]
     pub fn get_selected_container_id_state_name(&self) -> Option<(ContainerId, State, String)> {
         self.get_selected_container()
             .map(|i| (i.id.clone(), i.state, i.name.get().to_owned()))
@@ -646,6 +630,7 @@ impl AppData {
     /// Selected DockerCommand methods
     /// Get the current selected docker command
     /// So know which command to execute
+    #[must_use]
     pub fn selected_docker_controls(&self) -> Option<DockerCommand> {
         self.get_selected_container().and_then(|i| {
             i.docker_controls.state.selected().and_then(|x| {
@@ -774,6 +759,7 @@ impl AppData {
     }
 
     /// Get mutable Vec of current containers logs
+    #[must_use]
     pub fn get_logs(&self, size: Size, padding: usize) -> Vec<String> {
         self.containers
             .state
@@ -803,6 +789,7 @@ impl AppData {
 
     /// Error related methods
     /// Get single app_state error
+    #[must_use]
     pub fn get_error(&self) -> Option<AppError> {
         self.error.clone()
     }
@@ -822,11 +809,13 @@ impl AppData {
     /// Check if the selected container is a dockerised version of oxker
     /// So that can disallow commands to be send
     /// Is a shabby way of implementing this
+    #[must_use]
     pub fn is_oxker(&self) -> bool {
         self.get_selected_container().is_some_and(|i| i.is_oxker)
     }
 
     /// Check if selected container is oxker and also that oxker is being run in a container
+    #[must_use]
     pub fn is_oxker_in_container(&self) -> bool {
         self.get_selected_container()
             .is_some_and(|i| i.is_oxker && self.config.in_container)
@@ -835,6 +824,7 @@ impl AppData {
     /// Find the widths for the strings in the containers panel.
     /// So can display nicely and evenly
     /// Searches in both contains & hidden_containers
+    #[must_use]
     pub fn get_width(&self) -> Columns {
         let mut columns = Columns::new();
         let count = |x: &str| u8::try_from(x.chars().count()).unwrap_or(12);
@@ -911,23 +901,13 @@ impl AppData {
         // Sort will emit events when called from async context
     }
 
-    /// Update, or insert, containers
-    pub fn update_containers(&mut self, mut all_containers: Vec<ContainerSummary>) {
+    fn remove_deleted_containers(&mut self, all_containers: &[ContainerSummary]) {
         let all_ids = self
             .containers
             .items
             .iter()
             .map(|i| i.id.clone())
             .collect::<Vec<_>>();
-
-        // Only sort it no containers currently set, as afterwards the order is fixed
-        if self.containers.items.is_empty() {
-            all_containers.sort_by(|a, b| a.created.cmp(&b.created));
-        }
-
-        if !all_containers.is_empty() && self.containers.state.selected().is_none() {
-            self.containers.start();
-        }
 
         for (index, id) in all_ids.iter().enumerate() {
             if !all_containers
@@ -949,87 +929,119 @@ impl AppData {
                 }
             }
         }
+    }
 
-        for mut i in all_containers {
-            if let Some(id) = i.id.as_ref() {
-                let name = i.names.as_mut().map_or(String::new(), |names| {
-                    names.first_mut().map_or(String::new(), |f| {
-                        if f.starts_with('/') {
-                            f.remove(0);
-                        }
-                        (*f).to_string()
-                    })
-                });
+    fn update_or_insert_container(&mut self, summary: ContainerSummary) {
+        if let Some(id) = summary.id.as_ref() {
+            let name = summary.names.as_ref().map_or(String::new(), |names| {
+                names.first().map_or(String::new(), |f| {
+                    let mut name = f.clone();
+                    if name.starts_with('/') {
+                        name.remove(0);
+                    }
+                    name
+                })
+            });
 
-                let ports = i.ports.map_or(vec![], |i| {
-                    i.into_iter().map(ContainerPorts::from).collect::<Vec<_>>()
-                });
+            let ports = summary.ports.map_or(vec![], |ports| {
+                ports
+                    .into_iter()
+                    .map(ContainerPorts::from)
+                    .collect::<Vec<_>>()
+            });
 
-                let id = ContainerId::from(id.as_str());
+            let id = ContainerId::from(id.as_str());
 
-                let is_oxker = i
-                    .command
+            let is_oxker = summary
+                .command
+                .as_ref()
+                .is_some_and(|cmd| cmd.starts_with(ENTRY_POINT));
+
+            let status = ContainerStatus::from(
+                summary
+                    .status
                     .as_ref()
-                    .is_some_and(|i| i.starts_with(ENTRY_POINT));
-
-                let status = ContainerStatus::from(
-                    i.status
-                        .as_ref()
-                        .map_or(String::new(), std::clone::Clone::clone),
-                );
-                let state = State::from((
-                    i.state
-                        .as_ref()
-                        .map_or(&bollard::secret::ContainerSummaryStateEnum::DEAD, |z| z),
-                    &status,
-                ));
-                let image = i
-                    .image
+                    .map_or(String::new(), std::clone::Clone::clone),
+            );
+            let state = State::from((
+                summary
+                    .state
                     .as_ref()
-                    .map_or(String::new(), std::clone::Clone::clone);
+                    .map_or(&bollard::secret::ContainerSummaryStateEnum::DEAD, |s| s),
+                &status,
+            ));
+            let image = summary
+                .image
+                .as_ref()
+                .map_or(String::new(), std::clone::Clone::clone);
 
-                let created = i
-                    .created
-                    .map_or(0, |i| u64::try_from(i).unwrap_or_default());
+            let created = summary
+                .created
+                .map_or(0, |i| u64::try_from(i).unwrap_or_default());
 
-                if let Some(item) = self.get_any_container_by_id(&id) {
-                    if item.name.get() != name {
-                        item.name.set(name);
-                    }
-                    if item.status != status {
-                        item.status = status;
-                    }
-                    if item.state != state {
-                        item.docker_controls.items = DockerCommand::gen_vec(state);
-                        // Update the list state, needs to be None if the gen_vec returns an empty vec
-                        match state {
-                            State::Removing | State::Restarting | State::Unknown => {
-                                item.docker_controls.state.select(None);
-                            }
-                            _ => item.docker_controls.start(),
+            if let Some(item) = self.get_any_container_by_id(&id) {
+                if item.name.get() != name {
+                    item.name.set(name);
+                }
+                if item.status != status {
+                    item.status = status;
+                }
+                if item.state != state {
+                    item.docker_controls.items = DockerCommand::gen_vec(state);
+                    // Update the list state, needs to be None if the gen_vec returns an empty vec
+                    match state {
+                        State::Removing | State::Restarting | State::Unknown => {
+                            item.docker_controls.state.select(None);
                         }
-                        item.state = state;
+                        _ => item.docker_controls.start(),
                     }
+                    item.state = state;
+                }
 
-                    item.ports = ports;
+                item.ports = ports;
 
-                    if item.image.get() != image {
-                        item.image.set(image);
-                    }
+                if item.image.get() != image {
+                    item.image.set(image);
+                }
+            } else {
+                // container not known, so make new ContainerItem and push into containers Vec
+                let container = ContainerItem::new(ContainerItemInit {
+                    created,
+                    id,
+                    image,
+                    is_oxker,
+                    name,
+                    ports,
+                    state,
+                    status,
+                });
+                let can_insert = self.can_insert(&container);
+                if can_insert {
+                    self.containers.items.push(container);
                 } else {
-                    // container not known, so make new ContainerItem and push into containers Ve
-                    let container = ContainerItem::new(
-                        created, id, image, is_oxker, name, ports, state, status,
-                    );
-                    let can_insert = self.can_insert(&container);
-                    if can_insert {
-                        self.containers.items.push(container);
-                    } else {
-                        self.hidden_containers.push(container);
-                    }
+                    self.hidden_containers.push(container);
                 }
             }
-            // self.redraw.set_true("update_containers");
+        }
+    }
+
+    /// Update, or insert, containers
+    pub fn update_containers(&mut self, mut all_containers: Vec<ContainerSummary>) {
+        // Only sort if no containers currently set, as afterwards the order is fixed
+        if self.containers.items.is_empty() {
+            all_containers.sort_by(|a, b| a.created.cmp(&b.created));
+        }
+
+        if !all_containers.is_empty() && self.containers.state.selected().is_none() {
+            self.containers.start();
+        }
+
+        // Remove containers that no longer exist
+        self.remove_deleted_containers(&all_containers);
+
+        // Update or insert each container
+        for container in all_containers {
+            self.update_or_insert_container(container);
         }
 
         // Publish ContainerListUpdate event with current container data
@@ -1063,7 +1075,7 @@ impl AppData {
                     .publish(CoreEvent::ContainerListUpdate(containers))
                     .await
                 {
-                    eprintln!("Failed to publish container update event: {}", e);
+                    eprintln!("Failed to publish container update event: {e}");
                 }
             });
         }
@@ -1071,8 +1083,6 @@ impl AppData {
 
     /// Update logs of a given container, based on id
     pub fn update_log_by_id(&mut self, logs: Vec<String>, id: &ContainerId) {
-        let _color = self.config.color_logs;
-        let _raw = self.config.raw_logs;
         let format = self.config.timestamp_format.clone();
         let config_tz = self.config.timezone.clone();
 
@@ -1115,7 +1125,6 @@ impl AppData {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
 
     use super::*;
@@ -1773,16 +1782,16 @@ mod tests {
     fn test_app_data_get_control_items() {
         let test_state = |state: State, expected: &mut Vec<DockerCommand>| {
             let gen_item_state = |state: State| {
-                ContainerItem::new(
-                    1,
-                    ContainerId::from("1"),
-                    "image_1".to_owned(),
-                    false,
-                    "container_1".to_owned(),
-                    vec![],
+                ContainerItem::new(ContainerItemInit {
+                    created: 1,
+                    id: ContainerId::from("1"),
+                    image: "image_1".to_owned(),
+                    is_oxker: false,
+                    name: "container_1".to_owned(),
+                    ports: vec![],
                     state,
-                    ContainerStatus::from("Up 1 hour".to_owned()),
-                )
+                    status: ContainerStatus::from("Up 1 hour".to_owned()),
+                })
             };
             let mut app_data = gen_appdata(&[gen_item_state(state)]);
             app_data.containers_start();

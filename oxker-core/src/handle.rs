@@ -5,10 +5,10 @@ use tokio::sync::mpsc::{Sender, channel};
 use tracing::{debug, error, info};
 
 use crate::{
-    app_data::{AppData, ContainerId, DockerCommand, Header, Stats},
+    app_data::{AppData, ContainerId, DockerCommand, Header},
     config::{Config, Keymap},
     docker_data::{DockerData, DockerMessage},
-    events::{CoreCommand, CoreEvent, EventBus, types::SortField},
+    events::{CoreCommand, CoreEvent, EventBus},
 };
 
 /// The main handle for interacting with the oxker core functionality.
@@ -34,9 +34,13 @@ impl CoreHandle {
     ///
     /// ```
     /// let (event_bus, receiver) = EventBus::new(100);
-    /// let handle = CoreHandle::new(event_bus);
+    /// let handle = CoreHandle::new(event_bus, &config);
     /// ```
-    pub fn new(event_bus: EventBus, config: Config) -> Self {
+    ///
+    /// # Panics
+    ///
+    /// Panics if Docker connection fails
+    pub fn new(event_bus: EventBus, config: &Config) -> Self {
         info!("Creating new CoreHandle");
 
         // Create AppData instance
@@ -46,17 +50,22 @@ impl CoreHandle {
         )));
 
         // Create Docker client
-        let docker = match config.host.as_ref() {
-            Some(host) => Docker::connect_with_socket(host, 60, bollard::API_DEFAULT_VERSION)
-                .unwrap_or_else(|e| {
-                    error!("Failed to connect to Docker at {}: {}", host, e);
+        let docker = config.host.as_ref().map_or_else(
+            || {
+                Docker::connect_with_socket_defaults().unwrap_or_else(|e| {
+                    error!("Failed to connect to Docker: {}", e);
                     panic!("Docker connection failed");
-                }),
-            None => Docker::connect_with_socket_defaults().unwrap_or_else(|e| {
-                error!("Failed to connect to Docker: {}", e);
-                panic!("Docker connection failed");
-            }),
-        };
+                })
+            },
+            |host| {
+                Docker::connect_with_socket(host, 60, bollard::API_DEFAULT_VERSION).unwrap_or_else(
+                    |e| {
+                        error!("Failed to connect to Docker at {}: {}", host, e);
+                        panic!("Docker connection failed");
+                    },
+                )
+            },
+        );
 
         // Create channels for Docker communication
         let (docker_tx, docker_rx) = channel(100);
@@ -83,6 +92,137 @@ impl CoreHandle {
         }
     }
 
+    async fn send_control_command(
+        &self,
+        command: DockerCommand,
+        container_id: String,
+    ) -> Result<(), String> {
+        self.docker_tx
+            .send(DockerMessage::Control((
+                command,
+                ContainerId::from(container_id.as_str()),
+            )))
+            .await
+            .map_err(|e| format!("Failed to send {command} command: {e}"))
+    }
+
+    fn convert_to_event_containers(
+        containers: &[crate::app_data::ContainerItem],
+    ) -> Vec<crate::events::types::ContainerItem> {
+        containers
+            .iter()
+            .map(|c| crate::events::types::ContainerItem {
+                id: c.id.get().to_string(),
+                name: c.name.to_string(),
+                image: c.image.to_string(),
+                state: c.state.as_str().to_string(),
+                status: c.status.to_string(),
+                ports: c
+                    .ports
+                    .iter()
+                    .map(|p| crate::events::types::ContainerPort {
+                        ip: p.ip.map(|ip| ip.to_string()),
+                        private: p.private,
+                        public: p.public,
+                    })
+                    .collect(),
+            })
+            .collect()
+    }
+
+    async fn handle_refresh_stats(&self, container_id: String) -> Result<(), String> {
+        // Trigger an update
+        self.docker_tx
+            .send(DockerMessage::Update)
+            .await
+            .map_err(|e| format!("Failed to send update message: {e}"))?;
+
+        // Get current stats from containers
+        let event_stats_opt = {
+            let app_data = self.app_data.lock();
+            app_data
+                .get_container_items()
+                .iter()
+                .find(|c| c.id.get() == container_id)
+                .map(|container| crate::events::types::Stats {
+                    container_id: container_id.clone(),
+                    cpu_usage: container
+                        .cpu_stats
+                        .front()
+                        .map_or(0.0, crate::app_data::Stats::get_value),
+                    memory_usage: container
+                        .mem_stats
+                        .front()
+                        .map_or(0, crate::app_data::ByteStats::as_u64),
+                    memory_limit: container.mem_limit.as_u64(),
+                    network_rx: container.rx.as_u64(),
+                    network_tx: container.tx.as_u64(),
+                })
+        }; // Drop lock before await
+
+        if let Some(event_stats) = event_stats_opt {
+            self.event_bus
+                .publish(CoreEvent::ContainerStatsUpdate {
+                    container_id,
+                    stats: event_stats,
+                })
+                .await?;
+        }
+        Ok(())
+    }
+
+    async fn handle_filter_containers(&self) -> Result<(), String> {
+        // For now, just trigger a container update
+        self.docker_tx
+            .send(DockerMessage::Update)
+            .await
+            .map_err(|e| format!("Failed to send update message: {e}"))?;
+
+        // Get filtered containers
+        let event_containers = {
+            let app_data = self.app_data.lock();
+            Self::convert_to_event_containers(app_data.get_container_items())
+        }; // Drop lock before await
+
+        self.event_bus
+            .publish(CoreEvent::ContainerListUpdate(event_containers))
+            .await
+    }
+
+    async fn handle_sort_containers(
+        &self,
+        sort_field: crate::events::types::SortField,
+    ) -> Result<(), String> {
+        use crate::events::types::SortField;
+
+        // Map SortField to Header
+        let header = match sort_field {
+            SortField::Name => Header::Name,
+            SortField::State => Header::State,
+            SortField::Status => Header::Status,
+            SortField::Cpu => Header::Cpu,
+            SortField::Memory => Header::Memory,
+            SortField::Id => Header::Id,
+            SortField::Image => Header::Image,
+            SortField::NetworkRx => Header::Rx,
+            SortField::NetworkTx => Header::Tx,
+        };
+
+        // Sort containers and get the result
+        let event_containers = {
+            let mut app_data = self.app_data.lock();
+            app_data.set_sort_by_header(header);
+            app_data.sort_containers();
+
+            // Get sorted containers
+            Self::convert_to_event_containers(app_data.get_container_items())
+        }; // Drop lock before await
+
+        self.event_bus
+            .publish(CoreEvent::ContainerListUpdate(event_containers))
+            .await
+    }
+
     /// Executes a CoreCommand and emits corresponding events.
     ///
     /// This method processes UI commands, interacts with Docker (stubbed for now),
@@ -106,6 +246,10 @@ impl CoreHandle {
     ///     Err(e) => eprintln!("Command failed: {}", e),
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the command execution fails (e.g., Docker operation fails)
     pub async fn execute_command(&self, command: CoreCommand) -> Result<(), String> {
         debug!("Executing command: {:?}", command);
 
@@ -115,54 +259,20 @@ impl CoreHandle {
                 self.docker_tx
                     .send(DockerMessage::Update)
                     .await
-                    .map_err(|e| format!("Failed to send update message: {}", e))?;
+                    .map_err(|e| format!("Failed to send update message: {e}"))?;
 
                 // DockerData will publish ContainerListUpdate event when it's done
                 // This avoids the race condition of trying to read containers before they're updated
             }
             CoreCommand::RefreshStats(container_id) => {
-                // Stats are automatically updated by DockerData heartbeat
-                // Trigger an update
-                self.docker_tx
-                    .send(DockerMessage::Update)
-                    .await
-                    .map_err(|e| format!("Failed to send update message: {}", e))?;
-
-                // Get current stats from containers
-                let event_stats_opt = {
-                    let app_data = self.app_data.lock();
-                    let containers = app_data.get_container_items();
-                    containers
-                        .iter()
-                        .find(|c| c.id.get() == container_id)
-                        .map(|container| crate::events::types::Stats {
-                            container_id: container_id.clone(),
-                            cpu_usage: container.cpu_stats.front().map_or(0.0, |s| s.get_value()),
-                            memory_usage: container
-                                .mem_stats
-                                .front()
-                                .map_or(0, |s| s.get_value() as u64),
-                            memory_limit: container.mem_limit.get_value() as u64,
-                            network_rx: container.rx.get_value() as u64,
-                            network_tx: container.tx.get_value() as u64,
-                        })
-                }; // Drop lock before await
-
-                if let Some(event_stats) = event_stats_opt {
-                    self.event_bus
-                        .publish(CoreEvent::ContainerStatsUpdate {
-                            container_id,
-                            stats: event_stats,
-                        })
-                        .await?;
-                }
+                self.handle_refresh_stats(container_id).await?;
             }
             CoreCommand::RefreshLogs(container_id) => {
                 // Send a specific log refresh request for this container
                 self.docker_tx
                     .send(DockerMessage::RefreshLogs(container_id))
                     .await
-                    .map_err(|e| format!("Failed to send refresh logs message: {}", e))?;
+                    .map_err(|e| format!("Failed to send refresh logs message: {e}"))?;
             }
             CoreCommand::RemoveContainer(container_id) => {
                 // Send delete command to DockerData
@@ -172,140 +282,38 @@ impl CoreHandle {
                         ContainerId::from(container_id.as_str()),
                     )))
                     .await
-                    .map_err(|e| format!("Failed to send delete command: {}", e))?;
+                    .map_err(|e| format!("Failed to send delete command: {e}"))?;
 
                 self.event_bus
                     .publish(CoreEvent::ContainerRemoved(container_id))
                     .await?;
             }
             CoreCommand::StartContainer(container_id) => {
-                self.docker_tx
-                    .send(DockerMessage::Control((
-                        DockerCommand::Start,
-                        ContainerId::from(container_id.as_str()),
-                    )))
-                    .await
-                    .map_err(|e| format!("Failed to send start command: {}", e))?;
+                self.send_control_command(DockerCommand::Start, container_id)
+                    .await?;
             }
             CoreCommand::StopContainer(container_id) => {
-                self.docker_tx
-                    .send(DockerMessage::Control((
-                        DockerCommand::Stop,
-                        ContainerId::from(container_id.as_str()),
-                    )))
-                    .await
-                    .map_err(|e| format!("Failed to send stop command: {}", e))?;
+                self.send_control_command(DockerCommand::Stop, container_id)
+                    .await?;
             }
             CoreCommand::PauseContainer(container_id) => {
-                self.docker_tx
-                    .send(DockerMessage::Control((
-                        DockerCommand::Pause,
-                        ContainerId::from(container_id.as_str()),
-                    )))
-                    .await
-                    .map_err(|e| format!("Failed to send pause command: {}", e))?;
+                self.send_control_command(DockerCommand::Pause, container_id)
+                    .await?;
             }
             CoreCommand::RestartContainer(container_id) => {
-                self.docker_tx
-                    .send(DockerMessage::Control((
-                        DockerCommand::Restart,
-                        ContainerId::from(container_id.as_str()),
-                    )))
-                    .await
-                    .map_err(|e| format!("Failed to send restart command: {}", e))?;
+                self.send_control_command(DockerCommand::Restart, container_id)
+                    .await?;
             }
             CoreCommand::FilterContainers(_filter_text) => {
-                // For now, just trigger a container update
                 // TODO: Implement filter update when AppData provides public API
-                self.docker_tx
-                    .send(DockerMessage::Update)
-                    .await
-                    .map_err(|e| format!("Failed to send update message: {}", e))?;
-
-                // Get filtered containers
-                let event_containers = {
-                    let app_data = self.app_data.lock();
-                    let containers = app_data.get_container_items();
-                    containers
-                        .into_iter()
-                        .map(|c| crate::events::types::ContainerItem {
-                            id: c.id.get().to_string(),
-                            name: c.name.to_string(),
-                            image: c.image.to_string(),
-                            state: c.state.as_str().to_string(),
-                            status: c.status.to_string(),
-                            ports: c
-                                .ports
-                                .iter()
-                                .map(|p| crate::events::types::ContainerPort {
-                                    ip: p.ip.map(|ip| ip.to_string()),
-                                    private: p.private,
-                                    public: p.public,
-                                })
-                                .collect(),
-                        })
-                        .collect::<Vec<_>>()
-                }; // Drop lock before await
-
-                self.event_bus
-                    .publish(CoreEvent::ContainerListUpdate(event_containers))
-                    .await?;
+                self.handle_filter_containers().await?;
             }
             CoreCommand::SortContainers(sort_field, _sort_order) => {
-                // Map SortField to Header
-                let header = match sort_field {
-                    SortField::Name => Header::Name,
-                    SortField::State => Header::State,
-                    SortField::Status => Header::Status,
-                    SortField::Cpu => Header::Cpu,
-                    SortField::Memory => Header::Memory,
-                    SortField::Id => Header::Id,
-                    SortField::Image => Header::Image,
-                    SortField::NetworkRx => Header::Rx,
-                    SortField::NetworkTx => Header::Tx,
-                };
-
-                // Sort containers and get the result
-                let event_containers = {
-                    let mut app_data = self.app_data.lock();
-                    app_data.set_sort_by_header(header);
-                    app_data.sort_containers();
-
-                    // Get sorted containers
-                    let containers = app_data.get_container_items();
-                    containers
-                        .into_iter()
-                        .map(|c| crate::events::types::ContainerItem {
-                            id: c.id.get().to_string(),
-                            name: c.name.to_string(),
-                            image: c.image.to_string(),
-                            state: c.state.as_str().to_string(),
-                            status: c.status.to_string(),
-                            ports: c
-                                .ports
-                                .iter()
-                                .map(|p| crate::events::types::ContainerPort {
-                                    ip: p.ip.map(|ip| ip.to_string()),
-                                    private: p.private,
-                                    public: p.public,
-                                })
-                                .collect(),
-                        })
-                        .collect::<Vec<_>>()
-                }; // Drop lock before await
-
-                self.event_bus
-                    .publish(CoreEvent::ContainerListUpdate(event_containers))
-                    .await?;
+                self.handle_sort_containers(sort_field).await?;
             }
             CoreCommand::UnpauseContainer(container_id) => {
-                self.docker_tx
-                    .send(DockerMessage::Control((
-                        DockerCommand::Resume,
-                        ContainerId::from(container_id.as_str()),
-                    )))
-                    .await
-                    .map_err(|e| format!("Failed to send resume command: {}", e))?;
+                self.send_control_command(DockerCommand::Resume, container_id)
+                    .await?;
             }
             CoreCommand::ExecuteCommand {
                 container_id,
@@ -338,30 +346,13 @@ impl CoreHandle {
     /// let state = handle.state_view();
     /// println!("Current containers: {}", state.containers.len());
     /// ```
+    #[must_use]
     pub fn state_view(&self) -> CoreStateView {
         let app_data = self.app_data.lock();
         let containers = app_data.get_container_items();
 
         // Convert to event type
-        let event_containers: Vec<crate::events::types::ContainerItem> = containers
-            .into_iter()
-            .map(|c| crate::events::types::ContainerItem {
-                id: c.id.get().to_string(),
-                name: c.name.to_string(),
-                image: c.image.to_string(),
-                state: c.state.as_str().to_string(),
-                status: c.status.to_string(),
-                ports: c
-                    .ports
-                    .iter()
-                    .map(|p| crate::events::types::ContainerPort {
-                        ip: p.ip.map(|ip| ip.to_string()),
-                        private: p.private,
-                        public: p.public,
-                    })
-                    .collect(),
-            })
-            .collect();
+        let event_containers = Self::convert_to_event_containers(containers);
 
         drop(app_data); // Explicitly drop the lock
 
@@ -371,11 +362,13 @@ impl CoreHandle {
     }
 
     /// Get a clone of the keymap configuration
+    #[must_use]
     pub fn get_keymap(&self) -> Keymap {
         self.app_data.lock().config.keymap.clone()
     }
 
     /// Check if the selected container is oxker
+    #[must_use]
     pub fn is_oxker(&self) -> bool {
         self.app_data.lock().is_oxker()
     }
@@ -401,21 +394,22 @@ mod tests {
     async fn test_core_handle_creation() {
         let (event_bus, _receiver) = EventBus::new(10);
         let config = gen_config();
-        let handle = CoreHandle::new(event_bus, config);
+        let handle = CoreHandle::new(event_bus, &config);
 
         // Give DockerData time to initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         let state = handle.state_view();
         // State might have containers if Docker is running
-        assert!(state.containers.len() >= 0);
+        // Just verify we have a containers field
+        let _ = state.containers.len();
     }
 
     #[tokio::test]
     async fn test_refresh_containers_command() {
         let (event_bus, mut receiver) = EventBus::new(10);
         let config = gen_config();
-        let handle = CoreHandle::new(event_bus, config);
+        let handle = CoreHandle::new(event_bus, &config);
 
         // Give DockerData time to initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -430,7 +424,8 @@ mod tests {
         match event {
             CoreEvent::ContainerListUpdate(containers) => {
                 // With real Docker, container count may vary
-                assert!(containers.len() >= 0);
+                // Just verify we got a containers list
+                let _ = containers;
             }
             _ => panic!("Unexpected event type"),
         }
@@ -440,7 +435,7 @@ mod tests {
     async fn test_remove_container_command() {
         let (event_bus, mut receiver) = EventBus::new(10);
         let config = gen_config();
-        let handle = CoreHandle::new(event_bus, config);
+        let handle = CoreHandle::new(event_bus, &config);
 
         // Give DockerData time to initialize
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;

@@ -1,10 +1,10 @@
 use crate::handlers::UIContainerState;
-use crate::ui::gui_state::{DeleteButton, GuiState, SelectablePanel, Status};
+use crate::ui::gui_state::{GuiState, Status};
 use oxker_core::{
-    AppColors, AppError, ByteStats, Columns, ContainerId, ContainerPorts, CpuStats, CpuTuple,
-    DockerCommand, FilterBy, Header, MemTuple, SortedOrder, State, Stats,
+    AppColors, AppError, ByteStats, Columns, ContainerId, ContainerPorts, CpuStats, DockerCommand,
+    FilterBy, Header, SortedOrder, State, Stats,
 };
-use std::collections::{HashSet, VecDeque};
+use std::collections::HashSet;
 use std::time::Instant;
 
 /// Container view data for rendering
@@ -27,6 +27,8 @@ pub struct ContainerView {
 pub struct ChartData {
     pub cpu_data: (Vec<(f64, f64)>, CpuStats, State),
     pub mem_data: (Vec<(f64, f64)>, ByteStats, State),
+    pub current_cpu: CpuStats,
+    pub current_mem: ByteStats,
 }
 
 /// Port information for the selected container
@@ -79,10 +81,11 @@ pub struct FrameViewModel {
 
 impl FrameViewModel {
     /// Create a FrameViewModel from UIContainerState and GuiState
+    #[allow(clippy::cast_precision_loss)]
     pub fn from_state(
         ui_state: &UIContainerState,
         gui_state: &GuiState,
-        colors: AppColors,
+        _colors: AppColors,
         screen_width: u16,
     ) -> Self {
         // Convert containers to view models
@@ -93,7 +96,7 @@ impl FrameViewModel {
                 id: c.id.clone(),
                 name: c.name.to_string(),
                 image: c.image.to_string(),
-                state: c.state.clone(),
+                state: c.state,
                 status: c.status.get().to_string(),
                 cpu_stats: c.cpu_stats.back().copied().unwrap_or_default(),
                 mem_stats: c.mem_stats.back().copied().unwrap_or_default(),
@@ -120,7 +123,7 @@ impl FrameViewModel {
                 .mem_stats
                 .iter()
                 .enumerate()
-                .map(|(i, s)| (i as f64, s.get_value() as f64))
+                .map(|(i, s)| (i as f64, s.get_value()))
                 .collect();
 
             let max_cpu = container
@@ -136,9 +139,15 @@ impl FrameViewModel {
                 .copied()
                 .unwrap_or_default();
 
+            // Get the current stats from the container
+            let current_cpu = container.cpu_stats.back().copied().unwrap_or_default();
+            let current_mem = container.mem_stats.back().copied().unwrap_or_default();
+
             ChartData {
-                cpu_data: (cpu_data, max_cpu, container.state.clone()),
-                mem_data: (mem_data, max_mem, container.state.clone()),
+                cpu_data: (cpu_data, max_cpu, container.state),
+                mem_data: (mem_data, max_mem, container.state),
+                current_cpu,
+                current_mem,
             }
         });
 
@@ -148,7 +157,7 @@ impl FrameViewModel {
             let max_lens = calculate_port_max_lens(&ports);
             PortView {
                 ports,
-                state: container.state.clone(),
+                state: container.state,
                 max_lens,
             }
         });
@@ -170,12 +179,12 @@ impl FrameViewModel {
         let columns = calculate_columns(&containers, screen_width);
 
         // Calculate scroll title for logs (shows column position)
-        let scroll_title = if !ui_state.logs.is_empty() {
+        let scroll_title = if ui_state.logs.is_empty() {
+            None
+        } else {
             // TODO: Need to calculate actual column position and max width
             // For now, just show placeholder
-            Some(format!(" 1/80 → "))
-        } else {
-            None
+            Some(" 1/80 → ".to_string())
         };
 
         // Build the complete view model
@@ -209,7 +218,7 @@ impl FrameViewModel {
             scroll_title,
             sorted_by: ui_state.sort_header.as_ref().map(|header| {
                 (
-                    header.clone(),
+                    *header,
                     if ui_state.sort_ascending {
                         SortedOrder::Asc
                     } else {
@@ -222,11 +231,45 @@ impl FrameViewModel {
     }
 }
 
+impl Default for FrameViewModel {
+    fn default() -> Self {
+        Self {
+            containers: Vec::new(),
+            selected_container: None,
+            chart_data: None,
+            color_logs: false,
+            columns: Columns::new(),
+            container_title: String::new(),
+            delete_confirm: None,
+            filter_by: FilterBy::Name,
+            filter_term: None,
+            has_containers: false,
+            has_error: None,
+            info_text: None,
+            is_loading: false,
+            loading_icon: String::new(),
+            log_view: LogView {
+                logs: Vec::new(),
+                title: String::new(),
+            },
+            log_height: 4,
+            show_logs: true,
+            port_view: None,
+            commands_view: CommandsView {
+                commands: Vec::new(),
+            },
+            scroll_title: None,
+            sorted_by: None,
+            status: HashSet::new(),
+        }
+    }
+}
+
 /// Calculate maximum lengths for port display
 fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
     let max_ip = ports
         .iter()
-        .map(|p| p.ip.map(|ip| ip.to_string().len()).unwrap_or(0))
+        .map(|p| p.ip.map_or(0, |ip| ip.to_string().len()))
         .max()
         .unwrap_or(0);
     let max_private = ports
@@ -236,7 +279,7 @@ fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
         .unwrap_or(0);
     let max_public = ports
         .iter()
-        .map(|p| p.public.as_ref().map(|p| p.to_string().len()).unwrap_or(0))
+        .map(|p| p.public.as_ref().map_or(0, |p| p.to_string().len()))
         .max()
         .unwrap_or(0);
 
@@ -244,7 +287,7 @@ fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
 }
 
 /// Calculate column widths based on container data
-fn calculate_columns(containers: &[ContainerView], screen_width: u16) -> Columns {
+fn calculate_columns(containers: &[ContainerView], _screen_width: u16) -> Columns {
     // Calculate max widths for each column based on data
     let mut name_width = 4; // min "Name"
     let mut state_width = 5; // min "State"
@@ -272,13 +315,13 @@ fn calculate_columns(containers: &[ContainerView], screen_width: u16) -> Columns
     let net_width = 10; // "999.99 MB"
 
     Columns {
-        name: (Header::Name, name_width as u8),
-        state: (Header::State, state_width as u8),
-        status: (Header::Status, status_width as u8),
+        name: (Header::Name, u8::try_from(name_width).unwrap_or(30)),
+        state: (Header::State, u8::try_from(state_width).unwrap_or(12)),
+        status: (Header::Status, u8::try_from(status_width).unwrap_or(30)),
         cpu: (Header::Cpu, cpu_width),
         mem: (Header::Memory, mem_current_width, mem_limit_width),
         id: (Header::Id, id_width),
-        image: (Header::Image, image_width as u8),
+        image: (Header::Image, u8::try_from(image_width).unwrap_or(40)),
         net_rx: (Header::Rx, net_width),
         net_tx: (Header::Tx, net_width),
     }
@@ -291,6 +334,6 @@ fn create_container_title(count: usize, selected: Option<usize>) -> String {
     } else if let Some(idx) = selected {
         format!("Containers {}/{}", idx + 1, count)
     } else {
-        format!("Containers [{}]", count)
+        format!("Containers [{count}]")
     }
 }

@@ -199,18 +199,19 @@ impl Config {
     /// Else check the default location
     /// else just return the default config + the cli args
     /// cli args will take precedence over config settings
+    #[must_use]
     pub fn new() -> Self {
         let in_container = Self::check_if_in_container();
 
         let args = Args::parse();
         let config_from_cli = Self::from(&args);
 
-        if let Some(config_file) = &args.config_file {
-            if let Some(config_file) =
-                parse_config_file::ConfigFile::try_parse_from_file(config_file)
-            {
-                return Self::from(config_file).merge_args(config_from_cli);
-            }
+        if let Some(config_file) = args
+            .config_file
+            .as_ref()
+            .and_then(|f| parse_config_file::ConfigFile::try_parse_from_file(f))
+        {
+            return Self::from(config_file).merge_args(config_from_cli);
         }
 
         if let Some(config_file) = parse_config_file::ConfigFile::try_parse(in_container) {
@@ -221,7 +222,6 @@ impl Config {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use jiff::tz::TimeZone;
 

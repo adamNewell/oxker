@@ -5,6 +5,7 @@ use ratatui::{
 };
 
 /// Attempt to colorize the given string to ratatui standards
+#[must_use]
 pub fn colorize_logs<'a>(input: &str) -> Vec<Line<'a>> {
     vec![Line::from(
         categorise_text(input)
@@ -38,6 +39,7 @@ pub fn colorize_logs<'a>(input: &str) -> Vec<Line<'a>> {
 }
 
 /// Remove all ansi formatting from a given string and create ratatui Lines
+#[must_use]
 pub fn remove_ansi<'a>(input: &str) -> Vec<Line<'a>> {
     vec![Line::from(
         categorise_text(input)
@@ -50,6 +52,7 @@ pub fn remove_ansi<'a>(input: &str) -> Vec<Line<'a>> {
 }
 
 /// create ratatui Lines that exactly match the given strings
+#[must_use]
 pub fn raw<'a>(input: &str) -> Vec<Line<'a>> {
     vec![Line::from(input.escape_debug().collect::<String>())]
 }

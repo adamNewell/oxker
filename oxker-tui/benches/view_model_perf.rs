@@ -37,9 +37,9 @@ fn main() {
     // Add test containers
     let test_containers: Vec<EventContainerItem> = (1..=10)
         .map(|i| EventContainerItem {
-            id: format!("container_{}", i),
-            name: format!("test_container_{}", i),
-            image: format!("test_image_{}", i),
+            id: format!("container_{i}"),
+            name: format!("test_container_{i}"),
+            image: format!("test_image_{i}"),
             state: "running".to_string(),
             status: "Up 1 hour".to_string(),
             ports: vec![],
@@ -51,7 +51,7 @@ fn main() {
     // Add some stats
     for i in 1..=10 {
         let stats = Stats {
-            container_id: format!("container_{}", i),
+            container_id: format!("container_{i}"),
             cpu_usage: (i as f64) * 2.5,
             memory_usage: i as u64 * 1024 * 1024 * 10,
             memory_limit: 1024 * 1024 * 1024,
@@ -60,15 +60,12 @@ fn main() {
         };
         container_state
             .lock()
-            .update_container_stats(format!("container_{}", i), stats);
+            .update_container_stats(&format!("container_{i}"), &stats);
     }
 
     // Benchmark view model creation
     let iterations = 10000;
-    println!(
-        "Running {} iterations of FrameViewModel creation...",
-        iterations
-    );
+    println!("Running {iterations} iterations of FrameViewModel creation...");
 
     let start = Instant::now();
     for _ in 0..iterations {
@@ -80,11 +77,11 @@ fn main() {
     let duration = start.elapsed();
 
     println!("\nResults:");
-    println!("Total time: {:?}", duration);
+    println!("Total time: {duration:?}");
     println!("Average time per creation: {:?}", duration / iterations);
     println!(
         "Creations per second: {:.0}",
-        iterations as f64 / duration.as_secs_f64()
+        f64::from(iterations) / duration.as_secs_f64()
     );
 
     // Measure memory overhead

@@ -1,6 +1,6 @@
 use oxker_core::{AppColors, Config, CoreCommand, CoreEvent, CoreHandle, EventBus, Keymap};
 
-fn gen_config() -> Config {
+const fn gen_config() -> Config {
     Config {
         app_colors: AppColors::new(),
         color_logs: false,
@@ -27,7 +27,8 @@ async fn test_event_system_integration() {
     let (event_bus, mut receiver) = EventBus::new(100);
 
     // Create core handle
-    let handle = CoreHandle::new(event_bus, gen_config());
+    let config = gen_config();
+    let handle = CoreHandle::new(event_bus, &config);
 
     // Execute refresh containers command
     handle
@@ -40,7 +41,8 @@ async fn test_event_system_integration() {
     match event {
         CoreEvent::ContainerListUpdate(containers) => {
             // With real Docker integration, we may or may not have containers
-            assert!(containers.len() >= 0);
+            // Just verify we got a containers list (could be empty)
+            let _ = containers;
         }
         _ => panic!("Expected ContainerListUpdate event"),
     }
@@ -48,13 +50,15 @@ async fn test_event_system_integration() {
     // Verify state was updated
     let state = handle.state_view();
     // With real Docker integration, container count may vary
-    assert!(state.containers.len() >= 0);
+    // Just verify we have a containers field
+    let _ = state.containers.len();
 }
 
 #[tokio::test]
 async fn test_multiple_commands_and_events() {
     let (event_bus, mut receiver) = EventBus::new(100);
-    let handle = CoreHandle::new(event_bus, gen_config());
+    let config = gen_config();
+    let handle = CoreHandle::new(event_bus, &config);
 
     // Execute multiple commands
     handle
@@ -86,7 +90,8 @@ async fn test_no_ui_dependencies() {
     // This test ensures we can create and use the event system
     // without any UI types being required
     let (event_bus, _receiver) = EventBus::new(10);
-    let handle = CoreHandle::new(event_bus.clone(), gen_config());
+    let config = gen_config();
+    let handle = CoreHandle::new(event_bus.clone(), &config);
 
     // Basic operations should work without UI
     let _state = handle.state_view();

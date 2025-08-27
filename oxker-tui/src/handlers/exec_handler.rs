@@ -18,6 +18,7 @@ pub struct TuiExecInterface {
 }
 
 impl TuiExecInterface {
+    #[must_use]
     pub fn new(
         output_tx: mpsc::Sender<Vec<u8>>,
         input_rx: mpsc::Receiver<Vec<u8>>,
@@ -86,7 +87,14 @@ pub struct TuiTerminalHandler {
     cleanup_needed: Arc<AtomicBool>,
 }
 
+impl Default for TuiTerminalHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TuiTerminalHandler {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             cleanup_needed: Arc::new(AtomicBool::new(false)),
@@ -94,7 +102,7 @@ impl TuiTerminalHandler {
     }
 
     /// Performs the keyboard protocol cleanup sequence
-    fn perform_cleanup(&self) -> Result<(), AppError> {
+    fn perform_cleanup() -> Result<(), AppError> {
         const KEYBOARD_PROTO: &str = "\x1B[?u\x1B[c";
         const TTY: &str = "/dev/tty";
 
@@ -181,7 +189,7 @@ impl TerminalHandler for TuiTerminalHandler {
         {
             self.cleanup_needed
                 .store(false, std::sync::atomic::Ordering::SeqCst);
-            self.perform_cleanup()?;
+            Self::perform_cleanup()?;
         }
         Ok(())
     }
@@ -207,14 +215,18 @@ impl TerminalHandler for TuiTerminalHandler {
 impl Drop for TuiTerminalHandler {
     fn drop(&mut self) {
         // Best effort cleanup - ignore errors
-        if self.cleanup_needed.load(std::sync::atomic::Ordering::SeqCst) {
+        if self
+            .cleanup_needed
+            .load(std::sync::atomic::Ordering::SeqCst)
+        {
             let _ = disable_raw_mode();
-            let _ = self.perform_cleanup();
+            let _ = Self::perform_cleanup();
         }
     }
 }
 
 /// Helper to convert ratatui Terminal dimensions to our TerminalDimensions
+#[must_use]
 pub fn convert_terminal_size(
     terminal: &ratatui::Terminal<ratatui::backend::CrosstermBackend<std::io::Stdout>>,
 ) -> Option<TerminalDimensions> {

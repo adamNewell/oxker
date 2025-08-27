@@ -1,0 +1,22 @@
+# Clippy configuration for oxker project
+
+# Allow unwrap in tests - common practice for test assertions
+allow-unwrap-in-tests = true
+
+# Allow expect in tests - useful for test setup with descriptive error messages  
+allow-expect-in-tests = true
+
+# Allow print statements in tests for debugging
+allow-print-in-tests = true
+
+# Allow dbg! in tests
+allow-dbg-in-tests = true
+
+# Cognitive complexity threshold (default is 25)
+cognitive-complexity-threshold = 30
+
+# Function size threshold
+too-many-lines-threshold = 150
+
+# Struct bool fields threshold  
+max-struct-bools = 5

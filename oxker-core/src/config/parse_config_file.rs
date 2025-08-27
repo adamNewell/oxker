@@ -171,7 +171,6 @@ impl ConfigFile {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
 
     use crate::config::{AppColors, Keymap};

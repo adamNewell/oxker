@@ -82,7 +82,7 @@ async fn test_event_handler_receives_container_stats_update() {
         network_tx: 51_200,          // 50KB
     };
 
-    event_bus
+    let _ = event_bus
         .publish(CoreEvent::ContainerStatsUpdate {
             container_id: "test-container-1".to_string(),
             stats,
@@ -131,7 +131,7 @@ async fn test_event_handler_receives_logs_update() {
         },
     ];
 
-    event_bus
+    let _ = event_bus
         .publish(CoreEvent::ContainerLogsUpdate {
             container_id: "test-container-1".to_string(),
             logs,
@@ -167,7 +167,7 @@ async fn test_event_handler_receives_error_event() {
     sleep(Duration::from_millis(100)).await;
 
     // Publish error event
-    event_bus
+    let _ = event_bus
         .publish(CoreEvent::Error("Test error message".to_string()))
         .await;
 
@@ -221,14 +221,14 @@ async fn test_multiple_events_processed_in_order() {
         network_rx: 102_400,
         network_tx: 51_200,
     };
-    event_bus
+    let _ = event_bus
         .publish(CoreEvent::ContainerStatsUpdate {
             container_id: "test-container-1".to_string(),
             stats,
         })
         .await;
 
-    event_bus
+    let _ = event_bus
         .publish(CoreEvent::ContainerRemoved("test-container-2".to_string()))
         .await;
 

@@ -2,7 +2,8 @@ use oxker_core::events::types::{
     ContainerItem as EventContainerItem, LogLine, Stats as EventStats,
 };
 use oxker_core::{
-    ContainerId, ContainerItem, DockerCommand, Header, State as ContainerState, StatefulList,
+    ContainerId, ContainerItem, ContainerItemInit, DockerCommand, Header, State as ContainerState,
+    StatefulList,
 };
 use std::collections::VecDeque;
 
@@ -13,7 +14,7 @@ pub struct UIContainerState {
     /// List of containers with selection state
     pub containers: StatefulList<ContainerItem>,
     /// Currently selected container for operations
-    selected_container_id: Option<ContainerId>,
+    pub selected_container_id: Option<ContainerId>,
     /// Docker commands available for the selected container
     pub docker_commands: StatefulList<DockerCommand>,
     /// Logs for the selected container
@@ -33,6 +34,7 @@ pub struct UIContainerState {
 }
 
 impl UIContainerState {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             containers: StatefulList::new(vec![]),
@@ -57,17 +59,18 @@ impl UIContainerState {
     }
 
     /// Check if the state has changed significantly since last view model creation
-    pub fn has_significant_changes(&self) -> bool {
+    #[must_use]
+    pub const fn has_significant_changes(&self) -> bool {
         self.version != self.last_significant_change
     }
 
     /// Mark that changes have been rendered
-    pub fn mark_changes_rendered(&mut self) {
+    pub const fn mark_changes_rendered(&mut self) {
         self.last_significant_change = self.version;
     }
 
     /// Increment version for change tracking
-    fn increment_version(&mut self) {
+    const fn increment_version(&mut self) {
         self.version = self.version.wrapping_add(1);
     }
 
@@ -132,13 +135,14 @@ impl UIContainerState {
                     existing
                 } else {
                     // Create new container
-                    ContainerItem::new(
-                        index as u64,
-                        ContainerId::from(ec.id.as_str()),
-                        ec.image,
-                        false, // is_oxker - we'll need to determine this
-                        ec.name,
-                        ec.ports
+                    ContainerItem::new(ContainerItemInit {
+                        created: index as u64,
+                        id: ContainerId::from(ec.id.as_str()),
+                        image: ec.image,
+                        is_oxker: false, // is_oxker - we'll need to determine this
+                        name: ec.name,
+                        ports: ec
+                            .ports
                             .iter()
                             .map(|p| oxker_core::ContainerPorts {
                                 ip: p.ip.as_ref().and_then(|ip| ip.parse().ok()),
@@ -147,7 +151,7 @@ impl UIContainerState {
                             })
                             .collect(),
                         // Parse state and health from status
-                        match ec.state.as_str() {
+                        state: match ec.state.as_str() {
                             "dead" => ContainerState::Dead,
                             "exited" => ContainerState::Exited,
                             "paused" => ContainerState::Paused,
@@ -163,8 +167,8 @@ impl UIContainerState {
                             }
                             _ => ContainerState::Unknown,
                         },
-                        oxker_core::ContainerStatus::from(ec.status),
-                    )
+                        status: oxker_core::ContainerStatus::from(ec.status),
+                    })
                 }
             })
             .collect();
@@ -199,7 +203,7 @@ impl UIContainerState {
     }
 
     /// Update stats for a specific container
-    pub fn update_container_stats(&mut self, container_id: String, stats: EventStats) {
+    pub fn update_container_stats(&mut self, container_id: &str, stats: &EventStats) {
         if let Some(container) = self
             .containers
             .items
@@ -233,8 +237,7 @@ impl UIContainerState {
                 .state
                 .selected()
                 .and_then(|idx| self.containers.items.get(idx))
-                .map(|c| c.id.get() == container_id)
-                .unwrap_or(false)
+                .is_some_and(|c| c.id.get() == container_id)
             {
                 self.increment_version();
             }
@@ -242,50 +245,50 @@ impl UIContainerState {
     }
 
     /// Add logs for a container
-    pub fn add_logs(&mut self, container_id: String, logs: Vec<LogLine>) {
+    pub fn add_logs(&mut self, container_id: &str, logs: Vec<LogLine>) {
         // Only add logs if this is the selected container
         if let Some(selected) = self
             .containers
             .state
             .selected()
             .and_then(|idx| self.containers.items.get(idx))
+            && selected.id.get() == container_id
         {
-            if selected.id.get() == container_id {
-                // If logs are empty, it means the container has no logs to show
-                if logs.is_empty() {
-                    self.logs.clear();
-                } else {
-                    for log in logs {
-                        self.logs.push_back(log.message);
-                        // Keep log buffer reasonable size
-                        if self.logs.len() > 10000 {
-                            self.logs.pop_front();
-                        }
+            // If logs are empty, it means the container has no logs to show
+            if logs.is_empty() {
+                self.logs.clear();
+            } else {
+                for log in logs {
+                    self.logs.push_back(log.message);
+                    // Keep log buffer reasonable size
+                    if self.logs.len() > 10000 {
+                        self.logs.pop_front();
                     }
                 }
-                self.increment_version();
             }
+            self.increment_version();
         }
     }
 
     /// Remove a container
-    pub fn remove_container(&mut self, container_id: String) {
+    pub fn remove_container(&mut self, container_id: &str) {
         self.containers.items.retain(|c| c.id.get() != container_id);
         // Reset selection if needed
         if self.containers.state.selected().is_some() {
             let len = self.containers.items.len();
             if len == 0 {
                 self.containers.state.select(None);
-            } else if let Some(selected) = self.containers.state.selected() {
-                if selected >= len {
-                    self.containers.state.select(Some(len - 1));
-                }
+            } else if let Some(selected) = self.containers.state.selected()
+                && selected >= len
+            {
+                self.containers.state.select(Some(len - 1));
             }
         }
         self.increment_version();
     }
 
     /// Get the currently selected container ID
+    #[must_use]
     pub fn get_selected_container_id(&self) -> Option<ContainerId> {
         self.containers
             .state
@@ -310,7 +313,7 @@ impl UIContainerState {
             .selected()
             .and_then(|idx| self.containers.items.get(idx))
         {
-            let commands = DockerCommand::gen_vec(container.state.clone());
+            let commands = DockerCommand::gen_vec(container.state);
 
             // Preserve the current selection if possible
             let current_selection = self.docker_commands.state.selected();
@@ -360,12 +363,14 @@ impl UIContainerState {
     }
 
     /// Get container items for rendering
+    #[must_use]
     pub fn get_container_items(&self) -> Vec<ContainerItem> {
         self.containers.items.clone()
     }
 
     /// Get the total number of containers
-    pub fn get_container_count(&self) -> usize {
+    #[must_use]
+    pub const fn get_container_count(&self) -> usize {
         self.containers.items.len()
     }
 
@@ -375,7 +380,8 @@ impl UIContainerState {
     }
 
     /// Get logs for display
-    pub fn get_logs(&self) -> &VecDeque<String> {
+    #[must_use]
+    pub const fn get_logs(&self) -> &VecDeque<String> {
         &self.logs
     }
 
@@ -388,14 +394,15 @@ impl UIContainerState {
         self.docker_commands.previous();
     }
 
-    pub fn first_docker_command(&mut self) {
+    pub const fn first_docker_command(&mut self) {
         self.docker_commands.start();
     }
 
-    pub fn last_docker_command(&mut self) {
+    pub const fn last_docker_command(&mut self) {
         self.docker_commands.end();
     }
 
+    #[must_use]
     pub fn get_selected_docker_command(&self) -> Option<&DockerCommand> {
         self.docker_commands
             .state
@@ -420,7 +427,7 @@ impl UIContainerState {
         self.filter_term.clear();
     }
 
-    pub fn next_filter_field(&mut self) {
+    pub const fn next_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
             Header::Name => Header::Image,
             Header::Image => Header::State,
@@ -430,10 +437,9 @@ impl UIContainerState {
         };
     }
 
-    pub fn prev_filter_field(&mut self) {
+    pub const fn prev_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
             Header::Name => Header::Id,
-            Header::Image => Header::Name,
             Header::State => Header::Image,
             Header::Status => Header::State,
             Header::Id => Header::Status,

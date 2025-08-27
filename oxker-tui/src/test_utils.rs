@@ -1,16 +1,15 @@
 #[cfg(test)]
 pub mod test_utils {
     use crate::handlers::UIContainerState;
-    use crate::ui::{FrameViewModel, GuiState, Rerender, SelectablePanel, Status};
+    use crate::ui::{FrameViewModel, GuiState, Rerender};
     use oxker_core::{
-        AppColors, ByteStats, Config, ContainerId, ContainerItem, ContainerPorts, ContainerStatus,
-        CoreHandle, CpuStats, EventBus, Keymap, RunningState, State,
+        AppColors, ByteStats, Config, ContainerId, ContainerItem, ContainerItemInit,
+        ContainerPorts, ContainerStatus, CoreHandle, CpuStats, EventBus, Keymap, RunningState,
+        State,
     };
-    use oxker_core::{FilterBy, Header, SortedOrder};
     use parking_lot::Mutex;
-    use std::collections::{HashSet, VecDeque};
+    use std::collections::VecDeque;
     use std::sync::Arc;
-    use std::time::Instant;
 
     /// Test configuration builder
     pub struct TestConfigBuilder {
@@ -82,7 +81,7 @@ pub mod test_utils {
                 ports: vec![],
                 cpu_stats: VecDeque::new(),
                 mem_stats: VecDeque::new(),
-                mem_limit: ByteStats::new(1073741824), // 1GB
+                mem_limit: ByteStats::new(1_073_741_824), // 1GB
                 rx: ByteStats::new(0),
                 tx: ByteStats::new(0),
             }
@@ -123,16 +122,16 @@ pub mod test_utils {
         }
 
         pub fn build(self) -> ContainerItem {
-            let mut container = ContainerItem::new(
-                0, // index
-                self.id,
-                self.image,
-                false, // is_oxker
-                self.name,
-                self.ports,
-                self.state,
-                self.status,
-            );
+            let mut container = ContainerItem::new(ContainerItemInit {
+                created: 0, // index
+                id: self.id,
+                image: self.image,
+                is_oxker: false, // is_oxker
+                name: self.name,
+                ports: self.ports,
+                state: self.state,
+                status: self.status,
+            });
 
             // Set stats
             container.cpu_stats = self.cpu_stats;
@@ -159,7 +158,7 @@ pub mod test_utils {
             let config = TestConfigBuilder::new().with_show_logs(show_logs).build();
 
             let (event_bus, _receiver) = EventBus::new(10);
-            let core_handle = CoreHandle::new(event_bus, config);
+            let core_handle = CoreHandle::new(event_bus, &config);
 
             let rerender = Arc::new(Rerender::new());
             let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, show_logs)));
@@ -222,7 +221,7 @@ pub mod test_utils {
 
                 self.container_state
                     .lock()
-                    .add_logs(container_id.get().to_string(), log_lines);
+                    .add_logs(container_id.get(), log_lines);
             }
 
             self
@@ -244,7 +243,7 @@ pub mod test_utils {
 
                 self.container_state
                     .lock()
-                    .update_container_stats(container_id.to_string(), stats);
+                    .update_container_stats(container_id, &stats);
             }
 
             self
@@ -294,28 +293,27 @@ pub mod test_utils {
     }
 
     fn gen_item(id: &ContainerId, index: usize) -> ContainerItem {
-        ContainerItem::new(
-            u64::try_from(index).unwrap(),
-            id.clone(),
-            format!("image_{}", index),
-            false,
-            format!("container_{}", index),
-            vec![ContainerPorts {
+        ContainerItem::new(ContainerItemInit {
+            created: u64::try_from(index).unwrap(),
+            id: id.clone(),
+            image: format!("image_{}", index),
+            is_oxker: false,
+            name: format!("container_{}", index),
+            ports: vec![ContainerPorts {
                 ip: None,
                 private: u16::try_from(index).unwrap_or(1) + 8000,
                 public: Some(u16::try_from(index).unwrap_or(1) + 9000),
             }],
-            State::Running(RunningState::Healthy),
-            ContainerStatus::from("Up 1 hour".to_owned()),
-        )
+            state: State::Running(RunningState::Healthy),
+            status: ContainerStatus::from("Up 1 hour".to_owned()),
+        })
     }
 
     /// Generate test AppData
-    pub fn gen_appdata(containers: &[ContainerItem]) -> oxker_core::AppData {
-        use oxker_core::StatefulList;
+    pub fn gen_appdata(_containers: &[ContainerItem]) -> oxker_core::AppData {
         let (event_bus, _receiver) = EventBus::new(100);
         let event_bus = Arc::new(event_bus);
-        let mut app_data = oxker_core::AppData::new(gen_config(), event_bus);
+        let app_data = oxker_core::AppData::new(gen_config(), event_bus);
         // Note: This is a workaround for tests - containers field is private
         // In real code, we'd use the public API methods
         app_data

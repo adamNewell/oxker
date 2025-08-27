@@ -539,7 +539,6 @@ impl DockerData {
 
 // tests, use redis-test container, check logs exists, and selector of logs, and that it increases, and matches end, when you run restart on the docker containers
 #[cfg(test)]
-#[allow(clippy::float_cmp)]
 mod tests {
 
     use bollard::secret::{ContainerCpuStats, ContainerCpuUsage};
@@ -609,7 +608,7 @@ mod tests {
             throttling_data: None,
         });
         let cpu_percentage = DockerData::calculate_usage(&stats);
-        assert_eq!(50.0, cpu_percentage);
+        assert!((cpu_percentage - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -638,7 +637,7 @@ mod tests {
             throttling_data: None,
         });
         let cpu_percentage = DockerData::calculate_usage(&stats);
-        assert_eq!(25.0, cpu_percentage);
+        assert!((cpu_percentage - 25.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -667,7 +666,7 @@ mod tests {
             throttling_data: None,
         });
         let cpu_percentage = DockerData::calculate_usage(&stats);
-        assert_eq!(75.0, cpu_percentage);
+        assert!((cpu_percentage - 75.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -696,7 +695,7 @@ mod tests {
             throttling_data: None,
         });
         let cpu_percentage = DockerData::calculate_usage(&stats);
-        assert_eq!(100.0, cpu_percentage);
+        assert!((cpu_percentage - 100.0).abs() < f64::EPSILON);
     }
 
     #[test]
@@ -725,6 +724,6 @@ mod tests {
             throttling_data: None,
         });
         let cpu_percentage = DockerData::calculate_usage(&stats);
-        assert_eq!(175.0, cpu_percentage);
+        assert!((cpu_percentage - 175.0).abs() < f64::EPSILON);
     }
 }

@@ -6,7 +6,14 @@ pub struct Rerender {
     clear: AtomicBool,
 }
 
+impl Default for Rerender {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Rerender {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             draw: AtomicBool::new(true),

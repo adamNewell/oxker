@@ -1,3 +1,6 @@
+#![allow(clippy::significant_drop_tightening)]
+#![allow(clippy::significant_drop_in_scrutinee)]
+
 use crossterm::{
     event::{DisableMouseCapture, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
     execute,
@@ -74,6 +77,7 @@ impl InputHandler {
     }
 
     /// Sort the containers by a given header
+    #[allow(clippy::significant_drop_tightening)]
     async fn sort(&self, selected_header: Header) {
         // Update UI state to track the current sort - three states: unsorted, ascending, descending
         let (should_sort, ascending) = {
@@ -93,33 +97,29 @@ impl InputHandler {
                     }
                 } else {
                     // Different header clicked - start with ascending
-                    ui_state.sort_header = Some(selected_header.clone());
+                    ui_state.sort_header = Some(selected_header);
                     ui_state.sort_ascending = true;
                     (true, true)
                 }
             } else {
                 // Currently unsorted - start with ascending
-                ui_state.sort_header = Some(selected_header.clone());
+                ui_state.sort_header = Some(selected_header);
                 ui_state.sort_ascending = true;
                 (true, true)
             }
-        };
+        }; // ui_state lock is dropped here
 
         if should_sort {
-            if let Some(core_command) =
-                CommandMapper::header_to_sort_command(selected_header, ascending)
-            {
-                if let Err(e) = self.core_handle.execute_command(core_command).await {
-                    tracing::error!("Failed to execute sort command: {}", e);
-                }
+            let core_command = CommandMapper::header_to_sort_command(selected_header, ascending);
+            if let Err(e) = self.core_handle.execute_command(core_command).await {
+                tracing::error!("Failed to execute sort command: {}", e);
             }
         } else {
             // Reset to unsorted state - this might require a new command or just rely on container order
             // For now, we'll sort by Name ascending as the "unsorted" state
-            if let Some(core_command) = CommandMapper::header_to_sort_command(Header::Name, true) {
-                if let Err(e) = self.core_handle.execute_command(core_command).await {
-                    tracing::error!("Failed to reset sort: {}", e);
-                }
+            let core_command = CommandMapper::header_to_sort_command(Header::Name, true);
+            if let Err(e) = self.core_handle.execute_command(core_command).await {
+                tracing::error!("Failed to reset sort: {}", e);
             }
         }
     }
@@ -136,13 +136,10 @@ impl InputHandler {
     async fn confirm_delete(&self) {
         let id = self.gui_state.lock().get_delete_container();
         if let Some(id) = id {
-            if let Some(core_command) =
-                CommandMapper::docker_command_to_core(DockerCommand::Delete, id)
-            {
-                if let Err(e) = self.core_handle.execute_command(core_command).await {
-                    tracing::error!("Failed to delete container: {}", e);
-                    self.gui_state.lock().status_push(Status::Error);
-                }
+            let core_command = CommandMapper::docker_command_to_core(DockerCommand::Delete, &id);
+            if let Err(e) = self.core_handle.execute_command(core_command).await {
+                tracing::error!("Failed to delete container: {}", e);
+                self.gui_state.lock().status_push(Status::Error);
             }
         }
     }
@@ -154,7 +151,7 @@ impl InputHandler {
     }
 
     /// Validate that one can exec into a Docker container
-    async fn exec_key(&self) {
+    fn exec_key(&self) {
         let is_oxker = self.core_handle.is_oxker();
         if !is_oxker && tty_readable() {
             // Get selected container ID
@@ -200,18 +197,17 @@ impl InputHandler {
     }
 
     /// Save the currently selected containers logs into a `[container_name]_[timestamp].log` file
-    async fn save_logs(&self) -> Result<(), Box<dyn std::error::Error>> {
+    fn save_logs(&self) {
         // TODO: Implement log saving through CoreHandle
         // This requires a new CoreCommand for fetching and saving logs
         // For now, just show an error message
         self.gui_state
             .lock()
             .set_info_box("Log saving not yet implemented with CoreHandle");
-        Ok(())
     }
 
     /// Attempt to save the currently selected container logs to a file
-    async fn save_key(&self) {
+    fn save_key(&self) {
         let status = self.gui_state.lock().get_status();
         let contains = |s: Status| status.contains(&s);
 
@@ -219,9 +215,7 @@ impl InputHandler {
             self.gui_state.lock().status_push(Status::Logs);
             let uuid = Uuid::new_v4();
             GuiState::start_loading_animation(&self.gui_state, uuid);
-            if self.save_logs().await.is_err() {
-                self.gui_state.lock().status_push(Status::Error);
-            }
+            self.save_logs();
             self.gui_state.lock().status_del(Status::Logs);
             self.gui_state.lock().stop_loading_animation(uuid);
         }
@@ -231,25 +225,25 @@ impl InputHandler {
     async fn enter_key(&self) {
         // This isn't great, just means you can't send docker commands before full initialization of the program
         let panel = self.gui_state.lock().get_selected_panel();
-        if panel == SelectablePanel::Commands {
-            if let Err(e) = self.execute_selected_command().await {
-                tracing::error!("Failed to execute command: {}", e);
-                self.gui_state.lock().status_push(Status::Error);
-            }
+        if panel == SelectablePanel::Commands
+            && let Err(e) = self.execute_selected_command().await
+        {
+            tracing::error!("Failed to execute command: {}", e);
+            self.gui_state.lock().status_push(Status::Error);
         }
     }
 
     /// Execute the currently selected docker command with proper error handling
+    #[allow(clippy::significant_drop_tightening)]
     async fn execute_selected_command(&self) -> Result<(), String> {
         // Get selected container and command from UI state
         let (container_id, command) = {
+            let ui_selection = self.gui_state.lock().get_ui_commands_selection();
             let container_state = self.container_state.lock();
             let container_id = container_state
                 .get_selected_container_id()
                 .ok_or_else(|| "No container selected".to_string())?;
 
-            // Use UI selection to get the command
-            let ui_selection = self.gui_state.lock().get_ui_commands_selection();
             let command = container_state
                 .docker_commands
                 .items
@@ -264,11 +258,8 @@ impl InputHandler {
         }
 
         // Execute the command
-        if let Some(core_command) =
-            CommandMapper::docker_command_to_core(command, container_id.clone())
-        {
-            self.core_handle.execute_command(core_command).await?;
-        }
+        let core_command = CommandMapper::docker_command_to_core(command, &container_id);
+        self.core_handle.execute_command(core_command).await?;
 
         Ok(())
     }
@@ -320,6 +311,7 @@ impl InputHandler {
         self.gui_state.lock().selectable_panel_previous();
     }
 
+    #[allow(clippy::significant_drop_in_scrutinee)]
     fn scroll_start_key(&self) {
         let selected_panel = self.gui_state.lock().get_selected_panel();
         match selected_panel {
@@ -391,8 +383,11 @@ impl InputHandler {
             || self.keymap.clear.1 == Some(key_code)
             || self.keymap.toggle_help.0 == key_code
             || self.keymap.toggle_help.1 == Some(key_code)
+            || key_code == KeyCode::Char('?')
         {
             self.gui_state.lock().status_del(Status::Help);
+            // Force immediate redraw when closing help
+            self.gui_state.lock().force_redraw();
         }
 
         if self.keymap.toggle_mouse_capture.0 == key_code
@@ -557,19 +552,21 @@ impl InputHandler {
     }
 
     /// Handle button presses in all other scenarios
-    #[allow(clippy::cognitive_complexity)]
     async fn handle_others(&mut self, key_code: KeyCode, modifier: KeyModifiers) {
         self.handle_sort(key_code).await;
         // shift key plus arrows
         match key_code {
             _ if self.keymap.exec.0 == key_code || self.keymap.exec.1 == Some(key_code) => {
-                self.exec_key().await;
+                self.exec_key();
             }
 
             _ if self.keymap.toggle_help.0 == key_code
-                || self.keymap.toggle_help.1 == Some(key_code) =>
+                || self.keymap.toggle_help.1 == Some(key_code)
+                || key_code == KeyCode::Char('?') =>
             {
                 self.gui_state.lock().status_push(Status::Help);
+                // Force immediate redraw when opening help
+                self.gui_state.lock().force_redraw();
             }
 
             _ if self.keymap.toggle_mouse_capture.0 == key_code
@@ -598,7 +595,7 @@ impl InputHandler {
             _ if self.keymap.save_logs.0 == key_code
                 || self.keymap.save_logs.1 == Some(key_code) =>
             {
-                self.save_key().await;
+                self.save_key();
             }
 
             _ if self.keymap.select_next_panel.0 == key_code

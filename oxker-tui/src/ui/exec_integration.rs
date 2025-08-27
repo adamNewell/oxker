@@ -1,78 +1,53 @@
 use ratatui::{Terminal, backend::CrosstermBackend};
-use std::io::{Stdout, Write};
-/// Integration module for exec functionality with conditional compilation
+use std::io::Stdout;
+use std::io::Write;
 use std::sync::Arc;
 
-#[cfg(feature = "exec_refactor")]
 use {
     crate::handlers::exec_handler::{TuiExecInterface, TuiTerminalHandler, convert_terminal_size},
     oxker_core::TerminalHandler,
     tokio::sync::mpsc,
 };
 
-#[cfg(not(feature = "exec_refactor"))]
-use oxker_core::{ExecMode, TerminalSize};
-
-/// Convert the old TerminalSize to work with either implementation
-#[cfg(not(feature = "exec_refactor"))]
-pub fn get_terminal_size(terminal: &Terminal<CrosstermBackend<Stdout>>) -> Option<TerminalSize> {
-    TerminalSize::new(terminal)
-}
-
-#[cfg(feature = "exec_refactor")]
-pub fn get_terminal_size(
-    terminal: &Terminal<CrosstermBackend<Stdout>>,
-) -> Option<oxker_core::exec_interface::TerminalDimensions> {
-    convert_terminal_size(terminal)
-}
-
 /// Execute the exec mode with proper interface handling
 pub async fn run_exec_mode(
     mode: oxker_core::ExecMode,
     terminal: &Terminal<CrosstermBackend<Stdout>>,
 ) -> Result<(), oxker_core::AppError> {
-    #[cfg(not(feature = "exec_refactor"))]
-    {
-        mode.run(TerminalSize::new(terminal)).await
-    }
+    // Set up channels for output and input handling
+    let (output_tx, mut output_rx) = mpsc::channel(1024);
+    let (_input_tx, input_rx) = mpsc::channel(1024);
 
-    #[cfg(feature = "exec_refactor")]
-    {
-        // Set up channels for output and input handling
-        let (output_tx, mut output_rx) = mpsc::channel(1024);
-        let (input_tx, input_rx) = mpsc::channel(1024);
+    // Create the interface and handler
+    let dimensions = convert_terminal_size(terminal);
+    let interface = Arc::new(TuiExecInterface::new(output_tx, input_rx, dimensions));
+    let terminal_handler = Arc::new(TuiTerminalHandler::new());
 
-        // Create the interface and handler
-        let dimensions = convert_terminal_size(terminal);
-        let interface = Arc::new(TuiExecInterface::new(output_tx, input_rx, dimensions));
-        let terminal_handler = Arc::new(TuiTerminalHandler::new());
-
-        // Spawn output handler to write to stdout
-        let interface_clone = Arc::clone(&interface);
-        tokio::spawn(async move {
-            while let Some(data) = output_rx.recv().await {
-                let mut stdout = std::io::stdout();
-                if stdout.write_all(&data).is_err() {
-                    interface_clone.set_active(false);
-                    break;
-                }
-                if stdout.flush().is_err() {
-                    interface_clone.set_active(false);
-                    break;
-                }
+    // Spawn output handler to write to stdout
+    let interface_clone = Arc::clone(&interface);
+    tokio::spawn(async move {
+        while let Some(data) = output_rx.recv().await {
+            let mut stdout = std::io::stdout();
+            if stdout.write_all(&data).is_err() {
+                interface_clone.set_active(false);
+                break;
             }
-        });
-
-        // Spawn input handler if we need to handle TTY input
-        if terminal_handler.is_tty_available() {
-            tokio::spawn(async move {
-                // In a real implementation, this would read from the terminal input
-                // and send it through input_tx
-                // For now, this is a placeholder
-            });
+            if stdout.flush().is_err() {
+                interface_clone.set_active(false);
+                break;
+            }
         }
+    });
 
-        // Run the exec mode
-        mode.run(interface, terminal_handler).await
+    // Spawn input handler if we need to handle TTY input
+    if terminal_handler.is_tty_available() {
+        tokio::spawn(async move {
+            // In a real implementation, this would read from the terminal input
+            // and send it through input_tx
+            // For now, this is a placeholder
+        });
     }
+
+    // Run the exec mode
+    mode.run(interface, terminal_handler).await
 }

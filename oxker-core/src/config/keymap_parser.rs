@@ -116,7 +116,14 @@ config_struct!(
     toggle_mouse_capture
 );
 
+impl Default for Keymap {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Keymap {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             clear: (KeyCode::Char('c'), Some(KeyCode::Esc)),
@@ -173,20 +180,20 @@ impl From<Option<ConfigKeymap>> for Keymap {
             |vec_str: Option<Vec<String>>,
              keymap_field: &mut (KeyCode, Option<KeyCode>),
              keymap_clash: &mut HashSet<KeyCode>| {
-                if let Some(vec_str) = vec_str {
-                    if let Some(vec_keycode) = Self::try_parse_keycode(&vec_str) {
-                        if let Some(first) = vec_keycode.first() {
-                            keymap_clash.insert(*first);
-                            counter += 1;
-                            keymap_field.0 = *first;
-                        }
-                        if let Some(second) = vec_keycode.get(1) {
-                            keymap_clash.insert(*second);
-                            counter += 1;
-                            keymap_field.1 = Some(*second);
-                        } else {
-                            keymap_field.1 = None;
-                        }
+                if let Some(vec_str) = vec_str
+                    && let Some(vec_keycode) = Self::try_parse_keycode(&vec_str)
+                {
+                    if let Some(first) = vec_keycode.first() {
+                        keymap_clash.insert(*first);
+                        counter += 1;
+                        keymap_field.0 = *first;
+                    }
+                    if let Some(second) = vec_keycode.get(1) {
+                        keymap_clash.insert(*second);
+                        counter += 1;
+                        keymap_field.1 = Some(*second);
+                    } else {
+                        keymap_field.1 = None;
                     }
                 }
             };
@@ -296,16 +303,16 @@ impl Keymap {
 
         for key in input.iter().take(2) {
             if key.chars().count() == 1 {
-                if let Some(first_char) = key.chars().next() {
-                    if let Some(first_char) = match first_char {
+                if let Some(first_char) = key.chars().next()
+                    && let Some(valid_char) = match first_char {
                         x if x.is_ascii_alphabetic() || x.is_ascii_digit() => Some(first_char),
                         '/' | '\\' | ',' | '.' | '#' | '\'' | '[' | ']' | ';' | '=' | '-' => {
                             Some(first_char)
                         }
                         _ => None,
-                    } {
-                        output.push(KeyCode::Char(first_char));
                     }
+                {
+                    output.push(KeyCode::Char(valid_char));
                 }
             } else {
                 let keycode = match key.to_lowercase().as_str() {
@@ -357,7 +364,6 @@ impl Keymap {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
     use crossterm::event::{KeyCode, KeyModifiers};
 

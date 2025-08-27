@@ -1,5 +1,5 @@
 use parking_lot::Mutex;
-use ratatui::layout::{Constraint, Rect};
+use ratatui::layout::Rect;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -21,6 +21,7 @@ pub enum SelectablePanel {
 }
 
 impl SelectablePanel {
+    #[must_use]
     pub const fn title(self) -> &'static str {
         match self {
             Self::Containers => "Containers",
@@ -28,6 +29,7 @@ impl SelectablePanel {
             Self::Commands => "",
         }
     }
+    #[must_use]
     pub const fn next(self) -> Self {
         match self {
             Self::Containers => Self::Commands,
@@ -35,6 +37,7 @@ impl SelectablePanel {
             Self::Logs => Self::Containers,
         }
     }
+    #[must_use]
     pub const fn prev(self) -> Self {
         match self {
             Self::Containers => Self::Logs,
@@ -56,99 +59,6 @@ pub enum Region {
 pub enum DeleteButton {
     Confirm,
     Cancel,
-}
-
-#[allow(unused)]
-#[derive(Debug, Clone, Copy)]
-pub enum BoxLocation {
-    TopLeft,
-    TopCentre,
-    TopRight,
-    MiddleLeft,
-    MiddleCentre,
-    MiddleRight,
-    BottomLeft,
-    BottomCentre,
-    BottomRight,
-}
-
-impl BoxLocation {
-    /// Screen is divided into 3x3 sections
-    pub const fn get_indexes(self) -> (usize, usize) {
-        match self {
-            Self::TopLeft => (0, 0),
-            Self::TopCentre => (0, 1),
-            Self::TopRight => (0, 2),
-            Self::MiddleLeft => (1, 0),
-            Self::MiddleCentre => (1, 1),
-            Self::MiddleRight => (1, 2),
-            Self::BottomLeft => (2, 0),
-            Self::BottomCentre => (2, 1),
-            Self::BottomRight => (2, 2),
-        }
-    }
-
-    /// Get both the vertical and hoziztonal constrains
-    pub const fn get_constraints(
-        self,
-        blank_horizontal: u16,
-        blank_vertical: u16,
-        text_lines: u16,
-        text_width: u16,
-    ) -> ([Constraint; 3], [Constraint; 3]) {
-        (
-            Self::get_horizontal_constraints(self, blank_horizontal, text_width),
-            Self::get_vertical_constraints(self, blank_vertical, text_lines),
-        )
-    }
-
-    const fn get_horizontal_constraints(
-        self,
-        blank_horizontal: u16,
-        text_width: u16,
-    ) -> [Constraint; 3] {
-        match self {
-            Self::TopLeft | Self::MiddleLeft | Self::BottomLeft => [
-                Constraint::Min(text_width),
-                Constraint::Max(blank_horizontal),
-                Constraint::Max(blank_horizontal),
-            ],
-            Self::TopCentre | Self::MiddleCentre | Self::BottomCentre => [
-                Constraint::Max(blank_horizontal),
-                Constraint::Min(text_width),
-                Constraint::Max(blank_horizontal),
-            ],
-            Self::TopRight | Self::MiddleRight | Self::BottomRight => [
-                Constraint::Max(blank_horizontal),
-                Constraint::Max(blank_horizontal),
-                Constraint::Min(text_width),
-            ],
-        }
-    }
-
-    const fn get_vertical_constraints(
-        self,
-        blank_vertical: u16,
-        number_lines: u16,
-    ) -> [Constraint; 3] {
-        match self {
-            Self::TopLeft | Self::TopCentre | Self::TopRight => [
-                Constraint::Min(number_lines),
-                Constraint::Max(blank_vertical),
-                Constraint::Max(blank_vertical),
-            ],
-            Self::MiddleLeft | Self::MiddleCentre | Self::MiddleRight => [
-                Constraint::Max(blank_vertical),
-                Constraint::Min(number_lines),
-                Constraint::Max(blank_vertical),
-            ],
-            Self::BottomLeft | Self::BottomCentre | Self::BottomRight => [
-                Constraint::Max(blank_vertical),
-                Constraint::Max(blank_vertical),
-                Constraint::Min(number_lines),
-            ],
-        }
-    }
 }
 
 // loading animation frames
@@ -242,10 +152,12 @@ impl GuiState {
     }
 
     /// Get the screen width, used for offset char calculations
+    #[must_use]
     pub const fn get_screen_width(&self) -> u16 {
         self.screen_width
     }
 
+    #[must_use]
     pub const fn get_show_logs(&self) -> bool {
         self.show_logs
     }
@@ -265,6 +177,7 @@ impl GuiState {
     }
 
     /// Get the log height, *should* be a u8 between 0 and 80, essentially a percentage
+    #[must_use]
     pub const fn get_log_height(&self) -> u16 {
         self.log_height
     }
@@ -280,6 +193,7 @@ impl GuiState {
     }
 
     /// Get the currently selected panel
+    #[must_use]
     pub const fn get_selected_panel(&self) -> SelectablePanel {
         self.selected_panel
     }
@@ -299,6 +213,7 @@ impl GuiState {
     }
 
     /// Check if a given Rect (a clicked area of 1x1), interacts with any known delete button
+    #[must_use]
     pub fn get_intersect_button(&self, rect: Rect) -> Option<DeleteButton> {
         self.intersect_delete
             .iter()
@@ -309,6 +224,7 @@ impl GuiState {
     }
 
     /// Check if a given Rect (a clicked area of 1x1), interacts with any known panels
+    #[must_use]
     pub fn get_intersect_header(&self, rect: Rect) -> Option<Header> {
         self.intersect_heading
             .iter()
@@ -319,6 +235,7 @@ impl GuiState {
     }
 
     /// Check if a the "show/hide help" section has been clicked
+    #[must_use]
     pub fn get_intersect_help(&self, rect: Rect) -> bool {
         self.intersect_help
             .as_ref()
@@ -353,6 +270,7 @@ impl GuiState {
     }
 
     /// Check if an ContainerId is set in the delete_container field
+    #[must_use]
     pub fn get_delete_container(&self) -> Option<ContainerId> {
         self.delete_container_id.clone()
     }
@@ -371,6 +289,7 @@ impl GuiState {
     }
 
     /// Return a copy of the Status HashSet
+    #[must_use]
     pub fn get_status(&self) -> HashSet<Status> {
         self.status.clone()
     }
@@ -400,6 +319,7 @@ impl GuiState {
         self.rerender.update_draw();
     }
 
+    #[must_use]
     pub fn get_exec_mode(&self) -> Option<ExecMode> {
         self.exec_mode.clone()
     }
@@ -446,10 +366,12 @@ impl GuiState {
         self.rerender.update_draw();
     }
 
+    #[must_use]
     pub fn is_loading(&self) -> bool {
         !self.loading_set.is_empty()
     }
     /// If is_loading has any entries, return the char at FRAMES[index], else an empty char, which needs to take up the same space, hence ' '
+    #[must_use]
     pub fn get_loading(&self) -> char {
         if self.is_loading() {
             FRAMES[usize::from(self.loading_index)]
@@ -498,8 +420,14 @@ impl GuiState {
         self.rerender.update_draw();
     }
 
+    /// Force an immediate redraw of the UI
+    pub fn force_redraw(&mut self) {
+        self.rerender.update_draw();
+    }
+
     /// UI-only selection management (no business logic impact)
-    pub fn get_ui_commands_selection(&self) -> usize {
+    #[must_use]
+    pub const fn get_ui_commands_selection(&self) -> usize {
         self.ui_commands_selection
     }
 
@@ -526,7 +454,8 @@ impl GuiState {
         }
     }
 
-    pub fn get_ui_logs_position(&self) -> usize {
+    #[must_use]
+    pub const fn get_ui_logs_position(&self) -> usize {
         self.ui_logs_position
     }
 
@@ -535,7 +464,7 @@ impl GuiState {
         self.rerender.update_draw();
     }
 
-    pub fn scroll_ui_logs_up(&mut self, max_logs: usize) {
+    pub fn scroll_ui_logs_up(&mut self, _max_logs: usize) {
         if self.ui_logs_position > 0 {
             self.ui_logs_position -= 1;
             self.rerender.update_draw();

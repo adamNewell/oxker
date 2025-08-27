@@ -16,15 +16,17 @@ pub struct ListState {
 }
 
 impl ListState {
-    pub fn selected(&self) -> Option<usize> {
+    #[must_use]
+    pub const fn selected(&self) -> Option<usize> {
         self.selected
     }
 
-    pub fn select(&mut self, index: Option<usize>) {
+    pub const fn select(&mut self, index: Option<usize>) {
         self.selected = index;
     }
 
-    pub fn offset(&self) -> usize {
+    #[must_use]
+    pub const fn offset(&self) -> usize {
         // For now, always return 0 as we don't have viewport scrolling implemented
         0
     }
@@ -56,12 +58,14 @@ impl From<&str> for ContainerId {
 }
 
 impl ContainerId {
+    #[must_use]
     pub const fn get(&self) -> &str {
         self.0.as_str()
     }
 
     /// Only return first 8 chars of id, is usually more than enough for uniqueness
     /// need to update tests to use real ids, or atleast strings of the correct-ish length
+    #[must_use]
     pub fn get_short(&self) -> String {
         self.0.chars().take(8).collect::<String>()
     }
@@ -102,6 +106,7 @@ macro_rules! unit_struct {
         }
 
         impl $name {
+            #[must_use]
             pub const fn get(&self) -> &str {
                 self.0.as_str()
             }
@@ -150,14 +155,17 @@ impl From<Port> for ContainerPorts {
 }
 
 impl ContainerPorts {
+    #[must_use]
     pub fn len_ip(&self) -> usize {
         self.ip
             .as_ref()
             .map_or(0, |i| i.to_string().chars().count())
     }
+    #[must_use]
     pub fn len_private(&self) -> usize {
         format!("{}", self.private).chars().count()
     }
+    #[must_use]
     pub fn len_public(&self) -> usize {
         format!("{}", self.public.unwrap_or_default())
             .chars()
@@ -183,6 +191,7 @@ pub struct StatefulList<T> {
 }
 
 impl<T> StatefulList<T> {
+    #[must_use]
     pub fn new(items: Vec<T>) -> Self {
         Self {
             state: ListState::default(),
@@ -190,14 +199,14 @@ impl<T> StatefulList<T> {
         }
     }
 
-    pub fn end(&mut self) {
+    pub const fn end(&mut self) {
         let len = self.items.len();
         if len > 0 {
             self.state.select(Some(self.items.len() - 1));
         }
     }
 
-    pub fn start(&mut self) {
+    pub const fn start(&mut self) {
         self.state.select(Some(0));
     }
 
@@ -226,6 +235,7 @@ impl<T> StatefulList<T> {
 
     /// Return the current status of the select list, e.g. 2/5,
     /// MAYBE add up down arrows, check if at start or end etc
+    #[must_use]
     pub fn get_state_title(&self) -> String {
         if self.items.is_empty() {
             String::new()
@@ -259,11 +269,13 @@ impl From<String> for ContainerStatus {
 
 impl ContainerStatus {
     /// Check if a container is unhealthy
+    #[must_use]
     pub fn unhealthy(&self) -> bool {
         self.contains("(unhealthy)")
     }
 
     /// Get a reference to the source string
+    #[must_use]
     pub const fn get(&self) -> &String {
         &self.0
     }
@@ -296,11 +308,13 @@ pub enum State {
 
 impl State {
     /// The container is alive if the start is Running, either healthy or unhealthy
+    #[must_use]
     pub const fn is_alive(self) -> bool {
         matches!(self, Self::Running(_))
     }
 
     /// Check if state is running & healthy
+    #[must_use]
     pub const fn is_healthy(self) -> bool {
         match self {
             Self::Running(x) => match x {
@@ -312,6 +326,7 @@ impl State {
     }
 
     /// Get raw state string for API/event communication
+    #[must_use]
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Dead => "dead",
@@ -325,6 +340,7 @@ impl State {
     }
 
     /// Color of the state for the containers section
+    #[must_use]
     pub const fn get_color(self, colors: AppColors) -> Color {
         match self {
             Self::Dead => colors.container_state.dead,
@@ -338,6 +354,7 @@ impl State {
         }
     }
     /// Dirty way to create order for the state, rather than impl Ord
+    #[must_use]
     pub const fn order(self) -> u8 {
         match self {
             Self::Running(RunningState::Healthy) => 0,
@@ -456,6 +473,7 @@ pub enum DockerCommand {
 }
 
 impl DockerCommand {
+    #[must_use]
     pub const fn get_color(self, colors: AppColors) -> Color {
         match self {
             Self::Pause => colors.commands.pause,
@@ -468,6 +486,7 @@ impl DockerCommand {
     }
 
     /// Docker commands available depending on the containers state
+    #[must_use]
     pub fn gen_vec(state: State) -> Vec<Self> {
         match state {
             State::Dead | State::Exited => vec![Self::Start, Self::Restart, Self::Delete],
@@ -504,6 +523,7 @@ pub trait Stats {
 pub struct CpuStats(f64);
 
 impl CpuStats {
+    #[must_use]
     pub const fn new(value: f64) -> Self {
         Self(value)
     }
@@ -573,16 +593,29 @@ impl Ord for ByteStats {
 }
 
 impl ByteStats {
+    #[must_use]
     pub const fn new(value: u64) -> Self {
         Self(value)
     }
     pub const fn update(&mut self, value: u64) {
         self.0 = value;
     }
+    #[must_use]
+    pub const fn as_u64(&self) -> u64 {
+        self.0
+    }
 }
 
-#[allow(clippy::cast_precision_loss)]
 impl Stats for ByteStats {
+    // TODO: Investigate alternative approaches to avoid precision loss in chart data
+    // Current approach converts u64 bytes to f64 for charting libraries (ratatui).
+    // Precision loss only occurs for values > 2^52 (~4.5 petabytes), which is
+    // acceptable for container monitoring use cases.
+    // Alternatives considered:
+    // 1. Store as f64 from the start - but memory usage is discrete bytes, not floating point
+    // 2. Use different units (MB/GB) - but this would complicate the data pipeline
+    // 3. Use a charting library that supports u64 - not available in ratatui
+    #[allow(clippy::cast_precision_loss)]
     fn get_value(&self) -> f64 {
         self.0 as f64
     }
@@ -590,12 +623,22 @@ impl Stats for ByteStats {
 
 /// convert from bytes to kB, MB, GB etc
 impl fmt::Display for ByteStats {
+    #[allow(
+        clippy::cast_precision_loss,
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss
+    )]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let as_f64 = self.get_value();
-        let p = match as_f64 {
-            x if x >= ONE_GB => format!("{y:.2} GB", y = as_f64 / ONE_GB),
-            x if x >= ONE_MB => format!("{y:.2} MB", y = as_f64 / ONE_MB),
-            _ => format!("{y:.2} kB", y = as_f64 / ONE_KB),
+        let bytes = self.0;
+        let p = if bytes >= (ONE_GB as u64) {
+            let gb = bytes as f64 / ONE_GB;
+            format!("{gb:.2} GB")
+        } else if bytes >= (ONE_MB as u64) {
+            let mb = bytes as f64 / ONE_MB;
+            format!("{mb:.2} MB")
+        } else {
+            let kb = bytes as f64 / ONE_KB;
+            format!("{kb:.2} kB")
         };
         write!(f, "{p:>x$}", x = f.width().unwrap_or(1))
     }
@@ -618,12 +661,14 @@ impl fmt::Display for LogsTz {
 impl LogsTz {
     /// With a given &str, split into a logtz and content, so that we only need to `use split_once()` once
     /// The docker log, which should always contain a timestamp, is in the format `2023-01-14T19:13:30.783138328Z Lorem ipsum dolor sit amet`
+    #[must_use]
     pub fn splitter(input: &str) -> (Self, String) {
         let (tz, content) = input.split_once(' ').unwrap_or_default();
         (Self(tz.to_owned()), content.to_owned())
     }
 
     /// Display the timestamp in a given format, and if provided, with a timezone offset
+    #[must_use]
     pub fn display_with_formatter(&self, tz: Option<&TimeZone>, format: &str) -> Option<String> {
         self.0.parse::<Timestamp>().map_or(None, |t| {
             if let Some(tz) = tz.as_ref() {
@@ -637,9 +682,11 @@ impl LogsTz {
     }
 }
 
-/// Store the logs alongside a HashSet, each log *should* generate a unique timestamp,
-/// so if we store the timestamp separately in a HashSet, we can then check if we should insert a log line into the
-/// stateful list dependent on whether the timestamp is in the HashSet or not
+/// Store the logs alongside a HashSet.
+///
+/// Each log *should* generate a unique timestamp, so if we store the timestamp separately
+/// in a HashSet, we can then check if we should insert a log line into the stateful list
+/// dependent on whether the timestamp is in the HashSet or not
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Logs {
     lines: StatefulList<String>,
@@ -712,6 +759,7 @@ impl Logs {
     /// Where x is the abs different of the index plus the panel height & a padding
     /// Take into account the char offset, so that can scroll a line
     /// The rest can be just empty list items
+    #[must_use]
     pub fn get_visible_logs(&self, size: Size, padding: usize) -> Vec<String> {
         let current_index = self.lines.state.selected().unwrap_or_default();
         let height_padding = usize::from(size.height) + padding;
@@ -736,6 +784,7 @@ impl Logs {
     }
 
     /// The rest of the methods are basically forwarding from the underlying StatefulList
+    #[must_use]
     pub fn get_state_title(&self) -> String {
         self.lines.get_state_title()
     }
@@ -753,10 +802,11 @@ impl Logs {
     /// Add a padding so one char will always be visilbe?
     pub fn forward(&mut self, width: u16) {
         let offset = usize::from(self.offset);
-        if self.horizontal_scroll_able(width) {
-            if self.adjusted_max_width > 0 && offset < self.adjusted_max_width {
-                self.offset = self.offset.saturating_add(1);
-            }
+        if self.horizontal_scroll_able(width)
+            && self.adjusted_max_width > 0
+            && offset < self.adjusted_max_width
+        {
+            self.offset = self.offset.saturating_add(1);
         }
     }
 
@@ -773,15 +823,21 @@ impl Logs {
         self.lines.previous();
     }
 
-    pub fn end(&mut self) {
+    pub const fn end(&mut self) {
         self.lines.end();
     }
-    pub fn start(&mut self) {
+    pub const fn start(&mut self) {
         self.lines.start();
     }
 
+    #[must_use]
     pub const fn len(&self) -> usize {
         self.lines.items.len()
+    }
+
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.lines.items.is_empty()
     }
 
     pub const fn state(&mut self) -> &mut ListState {
@@ -824,38 +880,41 @@ impl fmt::Display for ContainerItem {
     }
 }
 
+/// Parameters for creating a new ContainerItem
+pub struct ContainerItemInit {
+    pub created: u64,
+    pub id: ContainerId,
+    pub image: String,
+    pub is_oxker: bool,
+    pub name: String,
+    pub ports: Vec<ContainerPorts>,
+    pub state: State,
+    pub status: ContainerStatus,
+}
+
 impl ContainerItem {
-    #[allow(clippy::too_many_arguments)]
     /// Create a new container item
-    pub fn new(
-        created: u64,
-        id: ContainerId,
-        image: String,
-        is_oxker: bool,
-        name: String,
-        ports: Vec<ContainerPorts>,
-        state: State,
-        status: ContainerStatus,
-    ) -> Self {
-        let mut docker_controls = StatefulList::new(DockerCommand::gen_vec(state));
+    #[must_use]
+    pub fn new(init: ContainerItemInit) -> Self {
+        let mut docker_controls = StatefulList::new(DockerCommand::gen_vec(init.state));
         docker_controls.start();
 
         Self {
             cpu_stats: VecDeque::with_capacity(60),
-            created,
+            created: init.created,
             docker_controls,
-            id,
-            image: image.into(),
-            is_oxker,
+            id: init.id,
+            image: init.image.into(),
+            is_oxker: init.is_oxker,
             last_updated: 0,
             logs: Logs::default(),
             mem_limit: ByteStats::default(),
             mem_stats: VecDeque::with_capacity(60),
-            name: name.into(),
-            ports,
+            name: init.name.into(),
+            ports: init.ports,
             rx: ByteStats::default(),
-            state,
-            status,
+            state: init.state,
+            status: init.status,
             tx: ByteStats::default(),
         }
     }
@@ -908,6 +967,7 @@ impl ContainerItem {
 
     /// Get chart info for cpu & memory in one function
     /// So only need to call .lock() once
+    #[must_use]
     pub fn get_chart_data(&self) -> (CpuTuple, MemTuple) {
         (self.get_cpu_chart_data(), self.get_mem_chart_data())
     }
@@ -927,8 +987,15 @@ pub struct Columns {
     pub net_tx: (Header, u8),
 }
 
+impl Default for Columns {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Columns {
     /// (Column titles, minimum header string length)
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             name: (Header::Name, 4),
@@ -945,7 +1012,6 @@ impl Columns {
 }
 
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
 mod tests {
 
     use jiff::tz::TimeZone;

@@ -58,29 +58,29 @@ impl AppColors {
                         let r = parts[0]
                             .trim()
                             .parse::<u8>()
-                            .map_err(|_| format!("Invalid RGB color: {}", s))?;
+                            .map_err(|_| format!("Invalid RGB color: {s}"))?;
                         let g = parts[1]
                             .trim()
                             .parse::<u8>()
-                            .map_err(|_| format!("Invalid RGB color: {}", s))?;
+                            .map_err(|_| format!("Invalid RGB color: {s}"))?;
                         let b = parts[2]
                             .trim()
                             .parse::<u8>()
-                            .map_err(|_| format!("Invalid RGB color: {}", s))?;
+                            .map_err(|_| format!("Invalid RGB color: {s}"))?;
                         return Ok(Color::Rgb(r, g, b));
                     }
                 } else if s.starts_with('#') && s.len() == 7 {
                     let r = u8::from_str_radix(&s[1..3], 16)
-                        .map_err(|_| format!("Invalid hex color: {}", s))?;
+                        .map_err(|_| format!("Invalid hex color: {s}"))?;
                     let g = u8::from_str_radix(&s[3..5], 16)
-                        .map_err(|_| format!("Invalid hex color: {}", s))?;
+                        .map_err(|_| format!("Invalid hex color: {s}"))?;
                     let b = u8::from_str_radix(&s[5..7], 16)
-                        .map_err(|_| format!("Invalid hex color: {}", s))?;
+                        .map_err(|_| format!("Invalid hex color: {s}"))?;
                     return Ok(Color::Rgb(r, g, b));
                 } else if let Ok(index) = s.parse::<u8>() {
                     return Ok(Color::Indexed(index));
                 }
-                Err(format!("Unknown color: {}", s))
+                Err(format!("Unknown color: {s}"))
             }
         }
     }
@@ -88,193 +88,211 @@ impl AppColors {
     fn map_color(color_str: Option<&str>, setter: &mut Color) {
         color_str.map(|i| Self::parse_color(i).map(|i| *setter = i).ok());
     }
+
+    fn apply_headers_colors(config_colors: &ConfigColors, app_colors: &mut Self) {
+        // Heading bar
+        if let Some(hb) = &config_colors.headers_bar {
+            Self::map_color(
+                hb.background.as_deref(),
+                &mut app_colors.headers_bar.background,
+            );
+            Self::map_color(
+                hb.loading_spinner.as_deref(),
+                &mut app_colors.headers_bar.loading_spinner,
+            );
+            Self::map_color(hb.text.as_deref(), &mut app_colors.headers_bar.text);
+            Self::map_color(
+                hb.text_selected.as_deref(),
+                &mut app_colors.headers_bar.text_selected,
+            );
+        }
+    }
+
+    fn apply_ui_colors(config_colors: &ConfigColors, app_colors: &mut Self) {
+        // Selectable panel borders
+        if let Some(b) = &config_colors.borders {
+            Self::map_color(b.selected.as_deref(), &mut app_colors.borders.selected);
+            Self::map_color(b.unselected.as_deref(), &mut app_colors.borders.unselected);
+        }
+
+        // Filter panel
+        if let Some(fc) = &config_colors.filter {
+            Self::map_color(fc.background.as_deref(), &mut app_colors.filter.background);
+            Self::map_color(fc.highlight.as_deref(), &mut app_colors.filter.highlight);
+
+            Self::map_color(
+                fc.selected_filter_background.as_deref(),
+                &mut app_colors.filter.selected_filter_background,
+            );
+            Self::map_color(
+                fc.selected_filter_text.as_deref(),
+                &mut app_colors.filter.selected_filter_text,
+            );
+            Self::map_color(fc.text.as_deref(), &mut app_colors.filter.text);
+        }
+    }
+
+    fn apply_popup_colors(config_colors: &ConfigColors, app_colors: &mut Self) {
+        // Error Popup
+        if let Some(ep) = &config_colors.popup_error {
+            Self::map_color(
+                ep.background.as_deref(),
+                &mut app_colors.popup_error.background,
+            );
+            Self::map_color(ep.text.as_deref(), &mut app_colors.popup_error.text);
+        }
+
+        // Help Popup
+        if let Some(hp) = &config_colors.popup_help {
+            Self::map_color(
+                hp.background.as_deref(),
+                &mut app_colors.popup_help.background,
+            );
+            Self::map_color(hp.text.as_deref(), &mut app_colors.popup_help.text);
+            Self::map_color(
+                hp.text_highlight.as_deref(),
+                &mut app_colors.popup_help.text_highlight,
+            );
+        }
+
+        // Info Popup
+        if let Some(ip) = &config_colors.popup_info {
+            Self::map_color(
+                ip.background.as_deref(),
+                &mut app_colors.popup_info.background,
+            );
+            Self::map_color(ip.text.as_deref(), &mut app_colors.popup_info.text);
+        }
+
+        // Delete Popup
+        if let Some(dp) = &config_colors.popup_delete {
+            Self::map_color(
+                dp.background.as_deref(),
+                &mut app_colors.popup_delete.background,
+            );
+            Self::map_color(dp.text.as_deref(), &mut app_colors.popup_delete.text);
+            Self::map_color(
+                dp.text_highlight.as_deref(),
+                &mut app_colors.popup_delete.text_highlight,
+            );
+        }
+    }
+
+    fn apply_chart_colors(config_colors: &ConfigColors, app_colors: &mut Self) {
+        // Chart Cpu
+        if let Some(cc) = &config_colors.chart_cpu {
+            Self::map_color(
+                cc.background.as_deref(),
+                &mut app_colors.chart_cpu.background,
+            );
+            Self::map_color(cc.border.as_deref(), &mut app_colors.chart_cpu.border);
+            Self::map_color(cc.max.as_deref(), &mut app_colors.chart_cpu.max);
+            Self::map_color(cc.points.as_deref(), &mut app_colors.chart_cpu.points);
+            Self::map_color(cc.title.as_deref(), &mut app_colors.chart_cpu.title);
+            Self::map_color(cc.y_axis.as_deref(), &mut app_colors.chart_cpu.y_axis);
+        }
+
+        // Chart Memory
+        if let Some(cm) = &config_colors.chart_memory {
+            Self::map_color(
+                cm.background.as_deref(),
+                &mut app_colors.chart_memory.background,
+            );
+            Self::map_color(cm.border.as_deref(), &mut app_colors.chart_memory.border);
+            Self::map_color(cm.max.as_deref(), &mut app_colors.chart_memory.max);
+            Self::map_color(cm.points.as_deref(), &mut app_colors.chart_memory.points);
+            Self::map_color(cm.title.as_deref(), &mut app_colors.chart_memory.title);
+            Self::map_color(cm.y_axis.as_deref(), &mut app_colors.chart_memory.y_axis);
+        }
+
+        // Chart ports
+        if let Some(cp) = &config_colors.chart_ports {
+            Self::map_color(
+                cp.background.as_deref(),
+                &mut app_colors.chart_ports.background,
+            );
+            Self::map_color(cp.border.as_deref(), &mut app_colors.chart_ports.border);
+            Self::map_color(cp.headings.as_deref(), &mut app_colors.chart_ports.headings);
+            Self::map_color(cp.text.as_deref(), &mut app_colors.chart_ports.text);
+            Self::map_color(cp.title.as_deref(), &mut app_colors.chart_ports.title);
+        }
+    }
+
+    fn apply_panel_colors(config_colors: &ConfigColors, app_colors: &mut Self) {
+        // Containers
+        if let Some(c) = &config_colors.containers {
+            Self::map_color(
+                c.background.as_deref(),
+                &mut app_colors.containers.background,
+            );
+            Self::map_color(c.icon.as_deref(), &mut app_colors.containers.icon);
+            Self::map_color(c.text.as_deref(), &mut app_colors.containers.text);
+            Self::map_color(c.text_rx.as_deref(), &mut app_colors.containers.text_rx);
+            Self::map_color(c.text_tx.as_deref(), &mut app_colors.containers.text_tx);
+        }
+
+        // Commands
+        if let Some(cc) = &config_colors.commands {
+            Self::map_color(
+                cc.background.as_deref(),
+                &mut app_colors.commands.background,
+            );
+            Self::map_color(cc.pause.as_deref(), &mut app_colors.commands.pause);
+            Self::map_color(cc.restart.as_deref(), &mut app_colors.commands.restart);
+            Self::map_color(cc.stop.as_deref(), &mut app_colors.commands.stop);
+            Self::map_color(cc.delete.as_deref(), &mut app_colors.commands.start);
+            Self::map_color(cc.resume.as_deref(), &mut app_colors.commands.resume);
+            Self::map_color(cc.start.as_deref(), &mut app_colors.commands.start);
+        }
+
+        // Logs panel
+        if let Some(cl) = &config_colors.logs {
+            Self::map_color(cl.background.as_deref(), &mut app_colors.logs.background);
+            Self::map_color(cl.text.as_deref(), &mut app_colors.logs.text);
+        }
+    }
+
+    fn apply_container_state_colors(config_colors: &ConfigColors, app_colors: &mut Self) {
+        // Container State
+        if let Some(cs) = &config_colors.container_state {
+            Self::map_color(cs.dead.as_deref(), &mut app_colors.container_state.dead);
+            Self::map_color(cs.exited.as_deref(), &mut app_colors.container_state.exited);
+            Self::map_color(cs.paused.as_deref(), &mut app_colors.container_state.paused);
+            Self::map_color(
+                cs.removing.as_deref(),
+                &mut app_colors.container_state.removing,
+            );
+            Self::map_color(
+                cs.restarting.as_deref(),
+                &mut app_colors.container_state.restarting,
+            );
+            Self::map_color(
+                cs.running_healthy.as_deref(),
+                &mut app_colors.container_state.running_healthy,
+            );
+            Self::map_color(
+                cs.running_unhealthy.as_deref(),
+                &mut app_colors.container_state.running_unhealthy,
+            );
+            Self::map_color(
+                cs.unknown.as_deref(),
+                &mut app_colors.container_state.unknown,
+            );
+        }
+    }
 }
 
 impl From<Option<ConfigColors>> for AppColors {
-    #[allow(clippy::too_many_lines)]
     fn from(value: Option<ConfigColors>) -> Self {
         let mut app_colors = Self::new();
 
         if let Some(config_colors) = value {
-            // Heading bar
-            if let Some(hb) = config_colors.headers_bar {
-                Self::map_color(
-                    hb.background.as_deref(),
-                    &mut app_colors.headers_bar.background,
-                );
-                Self::map_color(
-                    hb.loading_spinner.as_deref(),
-                    &mut app_colors.headers_bar.loading_spinner,
-                );
-                Self::map_color(hb.text.as_deref(), &mut app_colors.headers_bar.text);
-                Self::map_color(
-                    hb.text_selected.as_deref(),
-                    &mut app_colors.headers_bar.text_selected,
-                );
-            }
-
-            // Seletable panel borders
-            if let Some(b) = config_colors.borders {
-                Self::map_color(b.selected.as_deref(), &mut app_colors.borders.selected);
-                Self::map_color(b.unselected.as_deref(), &mut app_colors.borders.unselected);
-            }
-
-            // Error Popup
-            if let Some(ep) = config_colors.popup_error {
-                Self::map_color(
-                    ep.background.as_deref(),
-                    &mut app_colors.popup_error.background,
-                );
-                Self::map_color(ep.text.as_deref(), &mut app_colors.popup_error.text);
-            }
-
-            // Filter panel
-            if let Some(fc) = config_colors.filter {
-                Self::map_color(fc.background.as_deref(), &mut app_colors.filter.background);
-                Self::map_color(fc.highlight.as_deref(), &mut app_colors.filter.highlight);
-
-                Self::map_color(
-                    fc.selected_filter_background.as_deref(),
-                    &mut app_colors.filter.selected_filter_background,
-                );
-                Self::map_color(
-                    fc.selected_filter_text.as_deref(),
-                    &mut app_colors.filter.selected_filter_text,
-                );
-                Self::map_color(fc.text.as_deref(), &mut app_colors.filter.text);
-            }
-
-            // Help Popup
-            if let Some(hp) = config_colors.popup_help {
-                Self::map_color(
-                    hp.background.as_deref(),
-                    &mut app_colors.popup_help.background,
-                );
-                Self::map_color(hp.text.as_deref(), &mut app_colors.popup_help.text);
-                Self::map_color(
-                    hp.text_highlight.as_deref(),
-                    &mut app_colors.popup_help.text_highlight,
-                );
-            }
-
-            // Info Popup
-            if let Some(ip) = config_colors.popup_info {
-                Self::map_color(
-                    ip.background.as_deref(),
-                    &mut app_colors.popup_info.background,
-                );
-                Self::map_color(ip.text.as_deref(), &mut app_colors.popup_info.text);
-            }
-
-            // Delete Popup
-            if let Some(dp) = config_colors.popup_delete {
-                Self::map_color(
-                    dp.background.as_deref(),
-                    &mut app_colors.popup_delete.background,
-                );
-                Self::map_color(dp.text.as_deref(), &mut app_colors.popup_delete.text);
-                Self::map_color(
-                    dp.text_highlight.as_deref(),
-                    &mut app_colors.popup_delete.text_highlight,
-                );
-            }
-
-            // Chart Cpu
-            if let Some(cc) = config_colors.chart_cpu {
-                Self::map_color(
-                    cc.background.as_deref(),
-                    &mut app_colors.chart_cpu.background,
-                );
-                Self::map_color(cc.border.as_deref(), &mut app_colors.chart_cpu.border);
-                Self::map_color(cc.max.as_deref(), &mut app_colors.chart_cpu.max);
-                Self::map_color(cc.points.as_deref(), &mut app_colors.chart_cpu.points);
-                Self::map_color(cc.title.as_deref(), &mut app_colors.chart_cpu.title);
-                Self::map_color(cc.y_axis.as_deref(), &mut app_colors.chart_cpu.y_axis);
-            }
-
-            // Chart Memory
-            if let Some(cm) = config_colors.chart_memory {
-                Self::map_color(
-                    cm.background.as_deref(),
-                    &mut app_colors.chart_memory.background,
-                );
-                Self::map_color(cm.border.as_deref(), &mut app_colors.chart_memory.border);
-                Self::map_color(cm.max.as_deref(), &mut app_colors.chart_memory.max);
-                Self::map_color(cm.points.as_deref(), &mut app_colors.chart_memory.points);
-                Self::map_color(cm.title.as_deref(), &mut app_colors.chart_memory.title);
-                Self::map_color(cm.y_axis.as_deref(), &mut app_colors.chart_memory.y_axis);
-            }
-
-            // Chart ports
-            if let Some(cp) = config_colors.chart_ports {
-                Self::map_color(
-                    cp.background.as_deref(),
-                    &mut app_colors.chart_ports.background,
-                );
-                Self::map_color(cp.border.as_deref(), &mut app_colors.chart_ports.border);
-                Self::map_color(cp.headings.as_deref(), &mut app_colors.chart_ports.headings);
-                Self::map_color(cp.text.as_deref(), &mut app_colors.chart_ports.text);
-                Self::map_color(cp.title.as_deref(), &mut app_colors.chart_ports.title);
-            }
-
-            // Containers
-            if let Some(c) = config_colors.containers {
-                Self::map_color(
-                    c.background.as_deref(),
-                    &mut app_colors.containers.background,
-                );
-                Self::map_color(c.icon.as_deref(), &mut app_colors.containers.icon);
-                Self::map_color(c.text.as_deref(), &mut app_colors.containers.text);
-                Self::map_color(c.text_rx.as_deref(), &mut app_colors.containers.text_rx);
-                Self::map_color(c.text_tx.as_deref(), &mut app_colors.containers.text_tx);
-            }
-
-            // Commands
-            if let Some(cc) = config_colors.commands {
-                Self::map_color(
-                    cc.background.as_deref(),
-                    &mut app_colors.commands.background,
-                );
-                Self::map_color(cc.pause.as_deref(), &mut app_colors.commands.pause);
-                Self::map_color(cc.restart.as_deref(), &mut app_colors.commands.restart);
-                Self::map_color(cc.stop.as_deref(), &mut app_colors.commands.stop);
-                Self::map_color(cc.delete.as_deref(), &mut app_colors.commands.start);
-                Self::map_color(cc.resume.as_deref(), &mut app_colors.commands.resume);
-                Self::map_color(cc.start.as_deref(), &mut app_colors.commands.start);
-            }
-
-            // Logs panel
-            if let Some(cl) = config_colors.logs {
-                Self::map_color(cl.background.as_deref(), &mut app_colors.logs.background);
-                Self::map_color(cl.text.as_deref(), &mut app_colors.logs.text);
-            }
-
-            // Container State
-            if let Some(cs) = config_colors.container_state {
-                Self::map_color(cs.dead.as_deref(), &mut app_colors.container_state.dead);
-                Self::map_color(cs.exited.as_deref(), &mut app_colors.container_state.exited);
-                Self::map_color(cs.paused.as_deref(), &mut app_colors.container_state.paused);
-                Self::map_color(
-                    cs.removing.as_deref(),
-                    &mut app_colors.container_state.removing,
-                );
-                Self::map_color(
-                    cs.restarting.as_deref(),
-                    &mut app_colors.container_state.restarting,
-                );
-                Self::map_color(
-                    cs.running_healthy.as_deref(),
-                    &mut app_colors.container_state.running_healthy,
-                );
-                Self::map_color(
-                    cs.running_unhealthy.as_deref(),
-                    &mut app_colors.container_state.running_unhealthy,
-                );
-                Self::map_color(
-                    cs.unknown.as_deref(),
-                    &mut app_colors.container_state.unknown,
-                );
-            }
+            Self::apply_headers_colors(&config_colors, &mut app_colors);
+            Self::apply_ui_colors(&config_colors, &mut app_colors);
+            Self::apply_popup_colors(&config_colors, &mut app_colors);
+            Self::apply_chart_colors(&config_colors, &mut app_colors);
+            Self::apply_panel_colors(&config_colors, &mut app_colors);
+            Self::apply_container_state_colors(&config_colors, &mut app_colors);
         }
         app_colors
     }
@@ -522,7 +540,14 @@ pub struct AppColors {
     pub popup_info: PopupInfo,
 }
 
+impl Default for AppColors {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AppColors {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             borders: Borders::new(),
