@@ -3,7 +3,8 @@
 use crate::{
     handlers::UIContainerState,
     ui::{
-        FrameViewModel, GuiState, SelectablePanel, Status, components::Component, gui_state::Region,
+        FrameViewModel, GuiState, SelectablePanel, Status, color_conversion::IntoRatatuiColor,
+        components::Component, gui_state::Region,
     },
 };
 use oxker_core::{AppColors, CoreCommand};
@@ -49,16 +50,17 @@ impl LogsPanel {
 
         let mut block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(block_color))
+            .border_style(Style::default().fg(block_color.into_ratatui_color()))
             .title(Span::styled(
                 " Logs ",
                 Style::default()
-                    .fg(highlight_color)
+                    .fg(highlight_color.into_ratatui_color())
                     .add_modifier(Modifier::BOLD),
             ));
 
         if !props.view_model.color_logs {
-            block = block.style(Style::default().bg(props.theme.logs.background));
+            block =
+                block.style(Style::default().bg(props.theme.logs.background.into_ratatui_color()));
         }
 
         block
@@ -86,7 +88,8 @@ impl<'p> Component<'p> for LogsPanel {
                     .alignment(Alignment::Center);
 
             if !props.view_model.color_logs {
-                paragraph = paragraph.style(Style::default().fg(props.theme.logs.text));
+                paragraph = paragraph
+                    .style(Style::default().fg(props.theme.logs.text.into_ratatui_color()));
             }
 
             frame.render_widget(paragraph, area);
@@ -100,7 +103,8 @@ impl<'p> Component<'p> for LogsPanel {
                     .alignment(Alignment::Center);
 
                 if !props.view_model.color_logs {
-                    paragraph = paragraph.style(Style::default().fg(props.theme.logs.text));
+                    paragraph = paragraph
+                        .style(Style::default().fg(props.theme.logs.text.into_ratatui_color()));
                 }
 
                 frame.render_widget(paragraph, area);
@@ -130,7 +134,6 @@ impl<'p> Component<'p> for LogsPanel {
     }
 
     fn handle_event(&mut self, event: &Self::Event) -> Option<CoreCommand> {
-        // TODO: Implement when CoreCommand supports log navigation
         match event {
             LogEvent::ScrollUp
             | LogEvent::ScrollDown

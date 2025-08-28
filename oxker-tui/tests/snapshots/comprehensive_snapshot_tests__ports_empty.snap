@@ -1,0 +1,5 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&ports_panel, &props, 60, 8)"
+---
+

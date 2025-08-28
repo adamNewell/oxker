@@ -1,0 +1,5 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&headers_panel, &props, 120, 2)"
+---
+                                                                                                        ( h ) show help

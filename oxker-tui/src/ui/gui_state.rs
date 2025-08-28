@@ -336,8 +336,8 @@ impl GuiState {
     /// Change to next selectable panel
     pub fn selectable_panel_next(&mut self) {
         self.selected_panel = self.selected_panel.next();
-        // TODO: This should check container count from UIEventHandler state
-        // For now, just skip logs panel if height is 0
+        // TODO: Could be enhanced to check container count from UIEventHandler state
+        // Currently uses log_height as proxy for panel availability
         if self.log_height == 0 && self.get_selected_panel() == SelectablePanel::Logs {
             self.selected_panel = self.selected_panel.next();
         }
@@ -347,8 +347,8 @@ impl GuiState {
     /// Change to previous selectable panel
     pub fn selectable_panel_previous(&mut self) {
         self.selected_panel = self.selected_panel.prev();
-        // TODO: This should check container count from UIEventHandler state
-        // For now, just skip logs panel if height is 0
+        // TODO: Could be enhanced to check container count from UIEventHandler state
+        // Currently uses log_height as proxy for panel availability
         if self.log_height == 0 && self.get_selected_panel() == SelectablePanel::Logs {
             self.selected_panel = self.selected_panel.prev();
         }

@@ -1,4 +1,4 @@
-use ratatui::style::Color;
+use super::Color;
 
 /// The macro accepts a list of struct names with key names
 /// Returns a struct where every key name is an Option<String>, with the correct derived attributes

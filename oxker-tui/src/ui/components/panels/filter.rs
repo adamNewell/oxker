@@ -1,6 +1,6 @@
 //! Filter panel component for container filtering
 
-use crate::ui::components::Component;
+use crate::ui::{color_conversion::IntoRatatuiColor, components::Component};
 use oxker_core::{AppColors, FilterBy};
 use ratatui::{
     Frame,
@@ -29,11 +29,15 @@ impl FilterPanel {
     /// Create the filter_by spans, colored based on selection
     fn create_filter_by_spans(props: &FilterPanelProps) -> Vec<Span<'static>> {
         let selected = Style::default()
-            .bg(props.theme.filter.selected_filter_background)
-            .fg(props.theme.filter.selected_filter_text);
+            .bg(props
+                .theme
+                .filter
+                .selected_filter_background
+                .into_ratatui_color())
+            .fg(props.theme.filter.selected_filter_text.into_ratatui_color());
         let not_selected = Style::default()
-            .bg(props.theme.filter.background)
-            .fg(props.theme.filter.text);
+            .bg(props.theme.filter.background.into_ratatui_color())
+            .fg(props.theme.filter.text.into_ratatui_color());
 
         let options = [
             (" Name ", FilterBy::Name),
@@ -58,11 +62,11 @@ impl FilterPanel {
     /// Create the control button spans
     fn create_control_spans(props: &FilterPanelProps) -> Vec<Span<'static>> {
         let style_button = Style::default()
-            .fg(props.theme.filter.selected_filter_text)
-            .bg(props.theme.filter.highlight);
+            .fg(props.theme.filter.selected_filter_text.into_ratatui_color())
+            .bg(props.theme.filter.highlight.into_ratatui_color());
         let style_desc = Style::default()
-            .fg(props.theme.filter.text)
-            .bg(props.theme.filter.background);
+            .fg(props.theme.filter.text.into_ratatui_color())
+            .bg(props.theme.filter.background.into_ratatui_color());
 
         vec![
             Span::styled(" Esc ".to_string(), style_button),
@@ -78,12 +82,12 @@ impl FilterPanel {
             Span::styled(
                 " term: ".to_string(),
                 Style::default()
-                    .fg(props.theme.filter.highlight)
+                    .fg(props.theme.filter.highlight.into_ratatui_color())
                     .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 props.filter_term.clone().unwrap_or_default(),
-                Style::default().fg(props.theme.filter.text),
+                Style::default().fg(props.theme.filter.text.into_ratatui_color()),
             ),
         ]
     }
@@ -107,7 +111,8 @@ impl Component<'_> for FilterPanel {
         spans.extend(Self::create_term_spans(props));
 
         // Create the line with background color
-        let line = Line::from(spans).style(Style::default().bg(props.theme.filter.background));
+        let line = Line::from(spans)
+            .style(Style::default().bg(props.theme.filter.background.into_ratatui_color()));
 
         // Render the line
         frame.render_widget(line, area);

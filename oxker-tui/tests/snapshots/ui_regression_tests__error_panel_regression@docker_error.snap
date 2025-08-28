@@ -1,0 +1,14 @@
+---
+source: oxker-tui/tests/ui_regression_tests.rs
+expression: output
+---
+                                                                                
+              ╭───────────────────── Error ─────────────────────╮               
+              │                                                 │               
+              │   IO error with: Docker daemon is not running   │               
+              │                                                 │               
+              │             ( c | esc ) clear error             │               
+              │                                                 │               
+              │                 ( q ) quit oxker                │               
+              │                                                 │               
+              ╰─────────────────────────────────────────────────╯

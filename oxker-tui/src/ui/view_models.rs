@@ -182,8 +182,7 @@ impl FrameViewModel {
         let scroll_title = if ui_state.logs.is_empty() {
             None
         } else {
-            // TODO: Need to calculate actual column position and max width
-            // For now, just show placeholder
+            // TODO: Proper column tracking
             Some(" 1/80 → ".to_string())
         };
 

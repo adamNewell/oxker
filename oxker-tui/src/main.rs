@@ -251,6 +251,7 @@ pub mod tests {
 
         // Note: We can't directly set containers since it's private
         // Tests will need to be refactored to use CoreHandle instead
+        // TODO: Validate tests
         AppData::new(config, event_bus)
     }
 

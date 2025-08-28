@@ -1,8 +1,11 @@
 //! Error panel component for displaying application errors
 
-use crate::ui::components::{
-    Component,
-    constants::{NAME, VERSION, max_line_width},
+use crate::ui::{
+    color_conversion::IntoRatatuiColor,
+    components::{
+        Component,
+        constants::{NAME, VERSION, max_line_width},
+    },
 };
 use oxker_core::{AppColors, AppError, Keymap};
 use ratatui::{
@@ -62,10 +65,10 @@ impl ErrorPanel {
 
     /// Format key binding text
     fn format_key_text(
-        binding: (crossterm::event::KeyCode, Option<crossterm::event::KeyCode>),
+        binding: (oxker_core::KeyCode, Option<oxker_core::KeyCode>),
         suffix: &str,
     ) -> String {
-        use crossterm::event::KeyCode;
+        use oxker_core::KeyCode;
 
         fn key_to_string(key: KeyCode) -> String {
             match key {
@@ -134,8 +137,8 @@ impl<'p> Component<'p> for ErrorPanel {
         let paragraph = Paragraph::new(text)
             .style(
                 Style::default()
-                    .bg(props.theme.popup_error.background)
-                    .fg(props.theme.popup_error.text),
+                    .bg(props.theme.popup_error.background.into_ratatui_color())
+                    .fg(props.theme.popup_error.text.into_ratatui_color()),
             )
             .block(block)
             .alignment(Alignment::Center);

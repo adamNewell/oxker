@@ -1,0 +1,14 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&commands_panel, &props, 60, 10)"
+---
+┌ Commands ────────────────────────────────────────────────┐
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+│                                                          │
+└──────────────────────────────────────────────────────────┘

@@ -32,8 +32,28 @@ impl CoreHandle {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
+    /// use oxker_core::{EventBus, CoreHandle, Config, AppColors, Keymap};
+    ///
     /// let (event_bus, receiver) = EventBus::new(100);
+    /// let config = Config {
+    ///     color_logs: false,
+    ///     docker_interval_ms: 1000,
+    ///     gui: true,
+    ///     host: None,
+    ///     show_std_err: false,
+    ///     in_container: false,
+    ///     save_dir: None,
+    ///     raw_logs: false,
+    ///     show_self: false,
+    ///     app_colors: AppColors::new(),
+    ///     keymap: Keymap::new(),
+    ///     timestamp_format: "HH:MM:SS".to_string(),
+    ///     show_timestamp: false,
+    ///     use_cli: false,
+    ///     show_logs: true,
+    ///     timezone: None,
+    /// };
     /// let handle = CoreHandle::new(event_bus, &config);
     /// ```
     ///
@@ -239,12 +259,15 @@ impl CoreHandle {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
+    /// use oxker_core::{CoreCommand, CoreHandle};
+    /// # async fn example(handle: CoreHandle) {
     /// let result = handle.execute_command(CoreCommand::RefreshContainers).await;
     /// match result {
     ///     Ok(()) => println!("Command executed successfully"),
     ///     Err(e) => eprintln!("Command failed: {}", e),
     /// }
+    /// # }
     /// ```
     ///
     /// # Errors
@@ -342,9 +365,12 @@ impl CoreHandle {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
+    /// use oxker_core::CoreHandle;
+    /// # fn example(handle: CoreHandle) {
     /// let state = handle.state_view();
     /// println!("Current containers: {}", state.containers.len());
+    /// # }
     /// ```
     #[must_use]
     pub fn state_view(&self) -> CoreStateView {
@@ -419,26 +445,39 @@ mod tests {
             .await
             .unwrap();
 
-        // Check event was published
-        let event = receiver.recv().await.unwrap();
-        match event {
-            CoreEvent::ContainerListUpdate(containers) => {
-                // With real Docker, container count may vary
-                // Just verify we got a containers list
-                let _ = containers;
+        // Check event was published (may need to skip initial events)
+        let mut found = false;
+        let timeout = tokio::time::timeout(tokio::time::Duration::from_secs(5), async {
+            while let Some(event) = receiver.recv().await {
+                if let CoreEvent::ContainerListUpdate(containers) = event {
+                    // With real Docker, container count may vary
+                    // Just verify we got a containers list
+                    let _ = containers;
+                    found = true;
+                    break;
+                }
             }
-            _ => panic!("Unexpected event type"),
-        }
+        })
+        .await;
+
+        assert!(
+            timeout.is_ok(),
+            "Timeout waiting for ContainerListUpdate event"
+        );
+        assert!(found, "ContainerListUpdate event not found");
     }
 
     #[tokio::test]
     async fn test_remove_container_command() {
-        let (event_bus, mut receiver) = EventBus::new(10);
+        let (event_bus, mut receiver) = EventBus::new(100);
         let config = gen_config();
         let handle = CoreHandle::new(event_bus, &config);
 
-        // Give DockerData time to initialize
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        // Give DockerData time to initialize and drain any initial events
+        tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+
+        // Drain any initial events
+        while receiver.try_recv().is_ok() {}
 
         // Test container removal command
         handle
@@ -447,12 +486,20 @@ mod tests {
             .unwrap();
 
         // Check event was published
-        let event = receiver.recv().await.unwrap();
-        match event {
-            CoreEvent::ContainerRemoved(id) => {
-                assert_eq!(id, "test-container");
+        let timeout = tokio::time::timeout(tokio::time::Duration::from_secs(2), async {
+            while let Some(event) = receiver.recv().await {
+                if let CoreEvent::ContainerRemoved(id) = event {
+                    assert_eq!(id, "test-container");
+                    return true;
+                }
             }
-            _ => panic!("Unexpected event type"),
-        }
+            false
+        })
+        .await;
+
+        assert!(
+            timeout.is_ok() && timeout.unwrap(),
+            "ContainerRemoved event not found"
+        );
     }
 }

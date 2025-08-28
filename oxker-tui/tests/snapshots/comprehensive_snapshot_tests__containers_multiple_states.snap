@@ -1,0 +1,16 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&containers_panel, &props, 120, 12)"
+---
+┌ Containers ──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│nginx-web ✓ running Up 5 minutes 25.50% 104.86 MB / 1.07 GB   abc123 nginx:latest 0.00 kB 0.00 kB                     │
+│postgres-db ✖ exited Exited (0) 2 hours ago 00.00% 0.00 kB / 2.15 GB   def456 postgres:15 0.00 kB 0.00 kB             │
+│redis-cache ॥ paused Up 1 hour (Paused) 05.20% 52.43 MB / 536.87 MB   ghi789 redis:7-alpine 0.00 kB 0.00 kB           │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

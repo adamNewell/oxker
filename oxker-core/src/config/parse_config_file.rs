@@ -112,7 +112,7 @@ impl ConfigFile {
                 serde_json::from_str::<Self>(input).map_err(|i| AppError::Parse(i.to_string()))
             }
             ConfigFileFormat::Jsonc | ConfigFileFormat::JsoncAsJson => {
-                serde_json::from_str::<Self>(input).map_err(|i| AppError::Parse(i.to_string()))
+                serde_jsonc::from_str::<Self>(input).map_err(|i| AppError::Parse(i.to_string()))
             }
             ConfigFileFormat::Toml => {
                 toml::from_str::<Self>(input).map_err(|i| AppError::Parse(i.message().to_owned()))

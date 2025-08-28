@@ -4,11 +4,12 @@ use clap::Parser;
 use jiff::tz::TimeZone;
 use parse_args::Args;
 use parse_config_file::ConfigFile;
+mod color;
 mod color_parser;
 mod keymap_parser;
 
 use crate::{ENV_KEY, ENV_VALUE};
-pub use {color_parser::AppColors, keymap_parser::Keymap};
+pub use {color::Color, color_parser::AppColors, keymap_parser::Keymap};
 
 mod parse_args;
 mod parse_config_file;

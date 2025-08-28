@@ -16,6 +16,7 @@ use tokio::sync::mpsc::Sender;
 use tracing::error;
 
 // draw_blocks module removed - functionality migrated to components
+pub mod color_conversion;
 mod exec_integration;
 mod gui_state;
 mod redraw;
@@ -196,8 +197,7 @@ impl Ui {
             self.reset_terminal().ok();
             self.terminal.clear().ok();
             if let Err(_e) = exec_integration::run_exec_mode(mode, &self.terminal).await {
-                // TODO: Need to handle errors differently now that we don't have AppData
-                // For now, just update the gui_state
+                // Future enhancement: Could publish error events to event bus for detailed error handling
                 self.gui_state.lock().status_push(Status::Error);
             }
         }
@@ -290,9 +290,14 @@ impl Ui {
                 && let Ok(event) = event::read()
             {
                 if let Event::Key(key) = event {
-                    if key.kind == event::KeyEventKind::Press {
+                    if key.kind == event::KeyEventKind::Press
+                        && let Some(core_keycode) =
+                            crate::key_conversion::from_crossterm_keycode(key.code)
+                    {
+                        let core_modifiers =
+                            crate::key_conversion::from_crossterm_modifiers(key.modifiers);
                         self.input_tx
-                            .send(InputMessages::ButtonPress((key.code, key.modifiers)))
+                            .send(InputMessages::ButtonPress((core_keycode, core_modifiers)))
                             .await
                             .ok();
                     }
@@ -301,8 +306,10 @@ impl Ui {
                         event::MouseEventKind::Down(_)
                         | event::MouseEventKind::ScrollDown
                         | event::MouseEventKind::ScrollUp => {
+                            let core_modifiers =
+                                crate::key_conversion::from_crossterm_modifiers(m.modifiers);
                             self.input_tx
-                                .send(InputMessages::MouseEvent((m, m.modifiers)))
+                                .send(InputMessages::MouseEvent((m, core_modifiers)))
                                 .await
                                 .ok();
                         }
@@ -345,7 +352,7 @@ fn draw_frame(
 ) {
     // Use the component-based MainView
     use views::{View, main_view::MainView};
-    // TODO: Consider caching MainView instance to avoid recreation
+    // TODO: MainView is recreated each frame - could be optimized with caching if performance becomes an issue
     let main_view = MainView::new(config, keymap, gui_state, container_state);
     main_view.render(fd, f);
 }

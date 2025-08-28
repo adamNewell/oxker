@@ -1,0 +1,9 @@
+---
+source: oxker-tui/tests/ui_regression_tests.rs
+expression: output
+---
+┌Test──────────────┐
+│                  │
+│                  │
+│                  │
+└──────────────────┘

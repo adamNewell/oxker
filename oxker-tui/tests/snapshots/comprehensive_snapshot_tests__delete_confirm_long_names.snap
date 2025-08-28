@@ -1,0 +1,23 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&delete_panel, &props, 100, 30)"
+---
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+                                                                                                    
+  ╭────────────────────────────────────── Confirm Delete ───────────────────────────────────────╮   
+  │     Are you sure you want to delete container: very-long-container-name-that-might-wrap     │   
+  │                                                                                             │   
+  │         ╭──────────────────────────╮                   ╭───────────────────────────╮        │   
+  │         │         ( n ) no         │                   │         ( y ) yes         │        │   
+  │         ╰──────────────────────────╯                   ╰───────────────────────────╯        │   
+  │                                                                                             │   
+  ╰─────────────────────────────────────────────────────────────────────────────────────────────╯

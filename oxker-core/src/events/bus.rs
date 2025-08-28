@@ -26,7 +26,9 @@ impl EventBus {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
+    /// use oxker_core::{EventBus, CoreEvent};
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// let (event_bus, mut receiver) = EventBus::new(100);
     ///
     /// // Publish events
@@ -36,6 +38,8 @@ impl EventBus {
     /// while let Some(event) = receiver.recv().await {
     ///     // Handle event
     /// }
+    /// # Ok(())
+    /// # }
     /// ```
     #[must_use]
     pub fn new(buffer_size: usize) -> (Self, Receiver<CoreEvent>) {
@@ -56,11 +60,14 @@ impl EventBus {
     ///
     /// # Example
     ///
-    /// ```
+    /// ```no_run
+    /// use oxker_core::{EventBus, CoreEvent};
+    /// # async fn example(event_bus: EventBus, containers: Vec<oxker_core::events::types::ContainerItem>) {
     /// let result = event_bus.publish(CoreEvent::ContainerListUpdate(containers)).await;
     /// if let Err(e) = result {
     ///     eprintln!("Failed to publish event: {}", e);
     /// }
+    /// # }
     /// ```
     ///
     /// # Errors
@@ -82,6 +89,7 @@ impl EventBus {
     /// # Errors
     ///
     /// Always returns an error as subscription is not supported in the current design
+    /// TODO: Validate subscriptions are handled in EventBus
     pub fn subscribe(&self) -> Result<Receiver<CoreEvent>, String> {
         Err("subscribe() is not supported - use the receiver from new() instead".to_string())
     }

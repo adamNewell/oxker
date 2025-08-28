@@ -2,10 +2,11 @@
 
 use crate::ui::{
     FrameViewModel, Status,
+    color_conversion::IntoRatatuiColor,
     components::Component,
     gui_state::{GuiState, Region},
 };
-use oxker_core::{AppColors, CoreCommand, Header, Keymap, SortedOrder};
+use oxker_core::{AppColors, CoreCommand, Header, Keymap, SortedOrder, config::Color as CoreColor};
 use parking_lot::Mutex;
 use ratatui::{
     Frame,
@@ -47,13 +48,13 @@ impl HeadersPanel {
         let text = format!("{x:<width$}{MARGIN}", x = format!("{header}{suffix}"),);
         let count = u16::try_from(text.chars().count()).unwrap_or_default();
         let paragraph = Paragraph::new(text)
-            .style(Style::default().fg(color))
+            .style(Style::default().fg(color.into_ratatui_color()))
             .alignment(Alignment::Left);
         (paragraph, count)
     }
 
     /// Generate header block styling based on sort state
-    fn gen_header_block(props: &HeadersPanelProps, header: Header) -> (Color, &'static str) {
+    fn gen_header_block(props: &HeadersPanelProps, header: Header) -> (CoreColor, &'static str) {
         let mut color = props.theme.headers_bar.text;
         let mut suffix = "";
 
@@ -109,7 +110,7 @@ impl HeadersPanel {
         };
 
         let help_paragraph = Paragraph::new(help_text)
-            .style(Style::default().fg(help_text_color))
+            .style(Style::default().fg(help_text_color.into_ratatui_color()))
             .alignment(Alignment::Right);
 
         // If no containers, don't display the headers
@@ -128,7 +129,9 @@ impl HeadersPanel {
     /// Draw loading spinner
     fn draw_loading_spinner(frame: &mut Frame, props: &HeadersPanelProps, rect: Rect) {
         let loading_paragraph = Paragraph::new(format!("{:>2}", props.view_model.loading_icon))
-            .style(Style::default().fg(props.theme.headers_bar.loading_spinner))
+            .style(
+                Style::default().fg(props.theme.headers_bar.loading_spinner.into_ratatui_color()),
+            )
             .alignment(Alignment::Left);
         frame.render_widget(loading_paragraph, rect);
     }
@@ -194,7 +197,7 @@ impl<'p> Component<'p> for HeadersPanel {
         frame.render_widget(
             Block::default().style(
                 Style::default()
-                    .bg(props.theme.headers_bar.background)
+                    .bg(props.theme.headers_bar.background.into_ratatui_color())
                     .fg(Color::Reset),
             ),
             area,
@@ -225,10 +228,14 @@ impl<'p> Component<'p> for HeadersPanel {
     }
 
     fn handle_event(&mut self, event: &Self::Event) -> Option<CoreCommand> {
-        // TODO: Implement when CoreCommand supports these operations
         match event {
-            HeaderEvent::ToggleHelp => None, // Some(CoreCommand::ToggleHelp),
-            HeaderEvent::SortBy(_header) => None, // Some(CoreCommand::SortBy(*header)),
+            HeaderEvent::ToggleHelp => None, // Help toggle is handled by UI state, not CoreCommand
+            HeaderEvent::SortBy(_header) => {
+                // Note: Sorting could be implemented using CoreCommand::SortContainers
+                // but needs mapping from Header to SortField and determining SortOrder
+                // TODO: Implement sorting
+                None
+            }
         }
     }
 }
@@ -246,8 +253,8 @@ impl Default for HeadersPanel {
 }
 
 /// Format a key code for display
-fn format_key(key: crossterm::event::KeyCode) -> String {
-    use crossterm::event::KeyCode;
+fn format_key(key: oxker_core::KeyCode) -> String {
+    use oxker_core::KeyCode;
 
     match key {
         KeyCode::Char(c) => c.to_string(),

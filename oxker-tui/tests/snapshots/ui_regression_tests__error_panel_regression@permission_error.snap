@@ -1,0 +1,14 @@
+---
+source: oxker-tui/tests/ui_regression_tests.rs
+expression: output
+---
+                                                                                
+         ╭────────────────────────── Error ───────────────────────────╮         
+         │                                                            │         
+         │   IO error with: Permission denied: /var/run/docker.sock   │         
+         │                                                            │         
+         │                   ( c | esc ) clear error                  │         
+         │                                                            │         
+         │                       ( q ) quit oxker                     │         
+         │                                                            │         
+         ╰────────────────────────────────────────────────────────────╯

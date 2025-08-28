@@ -1,0 +1,15 @@
+---
+source: oxker-tui/tests/ui_regression_tests.rs
+expression: output
+---
+               ╭──────────────────── Error ────────────────────╮                
+               │                                               │                
+               │   IO error with: Failed to start container:   │                
+               │          - Port 8080 is already in use        │                
+               │              - Volume mount failed            │                
+               │                                               │                
+               │            ( c | esc ) clear error            │                
+               │                                               │                
+               │                ( q ) quit oxker               │                
+               │                                               │                
+               ╰───────────────────────────────────────────────╯

@@ -1,11 +1,11 @@
 //! Ports panel component for displaying container port mappings
 
-use crate::ui::{FrameViewModel, components::Component};
-use oxker_core::{AppColors, State};
+use crate::ui::{FrameViewModel, color_conversion::IntoRatatuiColor, components::Component};
+use oxker_core::{AppColors, State, config::Color as CoreColor};
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{Block, BorderType, Borders, Paragraph},
 };
@@ -27,7 +27,7 @@ impl PortsPanel {
     }
 
     /// Get the port title color based on container state
-    const fn get_port_title_color(colors: &AppColors, state: State) -> Color {
+    const fn get_port_title_color(colors: &AppColors, state: State) -> CoreColor {
         if state.is_alive() {
             colors.chart_ports.title
         } else {
@@ -45,13 +45,14 @@ impl<'p> Component<'p> for PortsPanel {
             let block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .style(Style::new().fg(props.theme.chart_ports.border))
+                .style(Style::new().fg(props.theme.chart_ports.border.into_ratatui_color()))
                 .title_alignment(Alignment::Center)
                 .title(Span::styled(
                     " ports ",
                     Style::default()
-                        .fg(Self::get_port_title_color(props.theme, port_view.state))
-                        .bg(props.theme.chart_ports.background)
+                        .fg(Self::get_port_title_color(props.theme, port_view.state)
+                            .into_ratatui_color())
+                        .bg(props.theme.chart_ports.background.into_ratatui_color())
                         .add_modifier(Modifier::BOLD),
                 ));
 
@@ -71,7 +72,7 @@ impl<'p> Component<'p> for PortsPanel {
                 let paragraph = Paragraph::new(Span::from(text).add_modifier(Modifier::BOLD))
                     .alignment(Alignment::Center)
                     .block(block)
-                    .bg(props.theme.chart_ports.background);
+                    .bg(props.theme.chart_ports.background.into_ratatui_color());
                 frame.render_widget(paragraph, area);
             } else {
                 // Build the port list
@@ -83,7 +84,11 @@ impl<'p> Component<'p> for PortsPanel {
                     "ip", "private", "public"
                 );
                 output.push(Line::from(
-                    Span::from(header_line).fg(props.theme.chart_ports.headings),
+                    Span::from(header_line).fg(props
+                        .theme
+                        .chart_ports
+                        .headings
+                        .into_ratatui_color()),
                 ));
 
                 // Port entries
@@ -93,13 +98,15 @@ impl<'p> Component<'p> for PortsPanel {
                         "{ip:>ip_width$}   {private:>private_width$}  {public:>public_width$}"
                     );
                     output.push(Line::from(
-                        Span::from(data_line).fg(props.theme.chart_ports.text),
+                        Span::from(data_line).fg(props.theme.chart_ports.text.into_ratatui_color()),
                     ));
                 }
 
-                let paragraph = Paragraph::new(output)
-                    .block(block)
-                    .bg(props.theme.chart_ports.background);
+                let paragraph = Paragraph::new(output).block(block).bg(props
+                    .theme
+                    .chart_ports
+                    .background
+                    .into_ratatui_color());
                 frame.render_widget(paragraph, area);
             }
         }

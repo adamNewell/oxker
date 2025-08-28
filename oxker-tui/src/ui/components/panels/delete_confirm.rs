@@ -2,6 +2,7 @@
 
 use crate::ui::{
     GuiState,
+    color_conversion::IntoRatatuiColor,
     components::Component,
     gui_state::{DeleteButton, Region},
 };
@@ -50,10 +51,10 @@ impl DeleteConfirmPanel {
 
     /// Format key binding text for yes/no buttons
     fn format_key_text(
-        binding: (crossterm::event::KeyCode, Option<crossterm::event::KeyCode>),
+        binding: (oxker_core::KeyCode, Option<oxker_core::KeyCode>),
         text: &str,
     ) -> String {
-        use crossterm::event::KeyCode;
+        use oxker_core::KeyCode;
 
         fn key_to_string(key: KeyCode) -> String {
             match key {
@@ -111,8 +112,8 @@ impl<'p> Component<'p> for DeleteConfirmPanel {
             .border_type(BorderType::Rounded)
             .style(
                 Style::default()
-                    .bg(props.theme.popup_delete.background)
-                    .fg(props.theme.popup_delete.text),
+                    .bg(props.theme.popup_delete.background.into_ratatui_color())
+                    .fg(props.theme.popup_delete.text.into_ratatui_color()),
             )
             .title_alignment(Alignment::Center)
             .borders(Borders::ALL);
@@ -123,8 +124,8 @@ impl<'p> Component<'p> for DeleteConfirmPanel {
             Span::styled(
                 props.container_name.get(),
                 Style::default()
-                    .fg(props.theme.popup_delete.text_highlight)
-                    .bg(props.theme.popup_delete.background)
+                    .fg(props.theme.popup_delete.text_highlight.into_ratatui_color())
+                    .bg(props.theme.popup_delete.background.into_ratatui_color())
                     .add_modifier(Modifier::BOLD),
             ),
         ]);
@@ -150,7 +151,9 @@ impl<'p> Component<'p> for DeleteConfirmPanel {
             Block::default()
                 .border_type(BorderType::Rounded)
                 .borders(Borders::ALL)
-                .style(Style::default().bg(props.theme.popup_delete.background))
+                .style(
+                    Style::default().bg(props.theme.popup_delete.background.into_ratatui_color()),
+                )
         };
 
         let yes_para = Paragraph::new(yes_text)
@@ -195,7 +198,10 @@ impl<'p> Component<'p> for DeleteConfirmPanel {
     }
 
     fn handle_event(&mut self, event: &Self::Event) -> Option<CoreCommand> {
-        // TODO: Implement when CoreCommand supports container deletion
+        // Note: CoreCommand::RemoveContainer exists but requires container ID, not name
+        // This component only has access to container name, so deletion must be handled
+        // by the parent component that has both name and ID
+        // TODO: Validate that deletion is handled by the parent component that has both name and ID
         match event {
             DeleteConfirmEvent::ConfirmDelete | DeleteConfirmEvent::CancelDelete => None,
         }
@@ -259,7 +265,7 @@ mod tests {
         let mut keymap = Keymap::new();
 
         // Customize keybindings
-        use crossterm::event::KeyCode;
+        use oxker_core::KeyCode;
         keymap.delete_confirm = (KeyCode::Enter, None);
         keymap.delete_deny = (KeyCode::Esc, None);
 

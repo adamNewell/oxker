@@ -7,7 +7,6 @@ use std::{
 
 use bollard::service::Port;
 use jiff::{Timestamp, tz::TimeZone};
-// TODO: Remove ratatui dependencies - these will be handled by UI layer
 
 /// A simple state manager to replace ratatui's ListState
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -27,7 +26,7 @@ impl ListState {
 
     #[must_use]
     pub const fn offset(&self) -> usize {
-        // For now, always return 0 as we don't have viewport scrolling implemented
+        // Always return 0 - viewport scrolling not implemented
         0
     }
 }
@@ -39,8 +38,7 @@ pub struct Size {
     pub height: u16,
 }
 
-use crate::config::AppColors;
-use ratatui::style::Color;
+use crate::config::{AppColors, Color};
 
 use super::Header;
 
@@ -607,14 +605,6 @@ impl ByteStats {
 }
 
 impl Stats for ByteStats {
-    // TODO: Investigate alternative approaches to avoid precision loss in chart data
-    // Current approach converts u64 bytes to f64 for charting libraries (ratatui).
-    // Precision loss only occurs for values > 2^52 (~4.5 petabytes), which is
-    // acceptable for container monitoring use cases.
-    // Alternatives considered:
-    // 1. Store as f64 from the start - but memory usage is discrete bytes, not floating point
-    // 2. Use different units (MB/GB) - but this would complicate the data pipeline
-    // 3. Use a charting library that supports u64 - not available in ratatui
     #[allow(clippy::cast_precision_loss)]
     fn get_value(&self) -> f64 {
         self.0 as f64

@@ -1,6 +1,6 @@
 //! Basic UI components that serve as building blocks for more complex widgets
 
-use crate::ui::components::Component;
+use crate::ui::{color_conversion::IntoRatatuiColor, components::Component};
 use oxker_core::AppColors;
 use ratatui::{
     Frame,
@@ -50,15 +50,15 @@ impl<'p> Component<'p> for Block {
 
         let mut block = RatatuiBlock::default()
             .borders(props.borders)
-            .border_style(Style::default().fg(border_color));
+            .border_style(Style::default().fg(border_color.into_ratatui_color()));
 
         if let Some(title) = props.title {
             let title_style = if props.selected {
                 Style::default()
-                    .fg(props.theme.filter.highlight)
+                    .fg(props.theme.filter.highlight.into_ratatui_color())
                     .add_modifier(Modifier::BOLD)
             } else {
-                Style::default().fg(props.theme.filter.text)
+                Style::default().fg(props.theme.filter.text.into_ratatui_color())
             };
 
             block = block.title(Line::from(vec![

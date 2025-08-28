@@ -16,6 +16,7 @@ pub mod events;
 pub mod exec;
 pub mod exec_interface;
 pub mod handle;
+pub mod keys;
 
 // Re-exports for public API
 pub use app_data::{
@@ -30,6 +31,7 @@ pub use events::{CoreCommand, CoreEvent, EventBus};
 pub use exec::{ExecMode, tty_readable};
 pub use exec_interface::{ExecInterface, TerminalDimensions, TerminalHandler};
 pub use handle::{CoreHandle, CoreStateView};
+pub use keys::{KeyCode, KeyModifiers};
 
 // Constants that were in main.rs, needed by config module
 pub const ENV_KEY: &str = "OXKER_RUNTIME";
@@ -40,7 +42,7 @@ pub const ENTRY_POINT: &str = "/app/oxker";
 #[cfg(test)]
 pub mod tests {
     use super::*;
-    use app_data::{ContainerPorts, StatefulList};
+    use app_data::{ContainerPorts, State};
     use bollard::service::{ContainerSummary, Port};
     use std::sync::Arc;
 
@@ -119,7 +121,70 @@ pub mod tests {
         let (event_bus, _receiver) = EventBus::new(100);
         let event_bus = Arc::new(event_bus);
         let mut app_data = AppData::new(gen_config(), event_bus);
-        app_data.containers = StatefulList::new(containers.to_vec());
+
+        // Convert ContainerItems to ContainerSummary for update_containers
+        let summaries: Vec<ContainerSummary> = containers
+            .iter()
+            .enumerate()
+            .map(|(i, item)| {
+                let id = Some(item.id.get().to_string());
+                let names = Some(vec![format!("/{}", item.name.get())]);
+                let image = Some(item.image.get().to_string());
+                let image_id = Some(format!("{}_image_id", item.id.get()));
+                let command = Some(format!("{}_command", item.id.get()));
+                let created = Some(i64::try_from(item.created).unwrap_or(i64::from(i as i32)));
+                let ports = Some(
+                    item.ports
+                        .iter()
+                        .map(|p| Port {
+                            ip: p.ip.map(|ip| ip.to_string()),
+                            private_port: p.private,
+                            public_port: p.public,
+                            typ: None,
+                        })
+                        .collect(),
+                );
+                let size_rw = Some(i64::from(i as i32 + 1));
+                let size_root_fs = Some(i64::from(i as i32 + 1));
+                let labels = None;
+                let state = match item.state {
+                    State::Paused => Some(bollard::secret::ContainerSummaryStateEnum::PAUSED),
+                    State::Dead => Some(bollard::secret::ContainerSummaryStateEnum::DEAD),
+                    State::Exited => Some(bollard::secret::ContainerSummaryStateEnum::EXITED),
+                    State::Removing => Some(bollard::secret::ContainerSummaryStateEnum::REMOVING),
+                    State::Restarting => {
+                        Some(bollard::secret::ContainerSummaryStateEnum::RESTARTING)
+                    }
+                    State::Running(_) => Some(bollard::secret::ContainerSummaryStateEnum::RUNNING),
+                    State::Unknown => None, // Unknown state should not map to any specific state
+                };
+                let status = Some(item.status.to_string());
+                let host_config = None;
+                let network_settings = None;
+                let mounts = None;
+
+                ContainerSummary {
+                    id,
+                    names,
+                    image,
+                    image_id,
+                    command,
+                    created,
+                    ports,
+                    size_rw,
+                    size_root_fs,
+                    labels,
+                    state,
+                    status,
+                    host_config,
+                    network_settings,
+                    mounts,
+                    image_manifest_descriptor: None,
+                }
+            })
+            .collect();
+
+        app_data.update_containers(summaries);
         app_data
     }
 

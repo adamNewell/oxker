@@ -1,3 +1,8 @@
+pub mod mock_core_handle;
+
+#[cfg(test)]
+mod mock_core_handle_test;
+
 #[cfg(test)]
 pub mod test_utils {
     use crate::handlers::UIContainerState;

@@ -1,0 +1,14 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&logs_panel, &props, 80, 10)"
+---
+┌ Logs ────────────────────────────────────────────────────────────────────────┐
+│→ Container stopped.                                                          │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘

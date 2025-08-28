@@ -1,0 +1,20 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&delete_panel, &props, 80, 24)"
+---
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+                                                                                
+        ╭─────────────────────── Confirm Delete ───────────────────────╮        
+        │     Are you sure you want to delete container: nginx-web     │        
+        │                                                              │        
+        │     ╭──────────────────╮            ╭──────────────────╮     │        
+        │     │     ( n ) no     │            │     ( y ) yes    │     │        
+        │     ╰──────────────────╯            ╰──────────────────╯     │        
+        │                                                              │        
+        ╰──────────────────────────────────────────────────────────────╯

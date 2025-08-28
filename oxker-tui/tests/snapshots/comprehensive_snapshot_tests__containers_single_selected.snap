@@ -1,0 +1,14 @@
+---
+source: oxker-tui/tests/comprehensive_snapshot_tests.rs
+expression: "render_component(&containers_panel, &props, 120, 10)"
+---
+┌ Containers ──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│nginx-web ✓ running Up 5 minutes 28.00% 110.10 MB / 1.07 GB   abc123 nginx:latest 0.00 kB 0.00 kB                     │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+│                                                                                                                      │
+└──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘

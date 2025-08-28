@@ -2,7 +2,10 @@
 
 use crate::{
     handlers::UIContainerState,
-    ui::{FrameViewModel, GuiState, SelectablePanel, components::Component, gui_state::Region},
+    ui::{
+        FrameViewModel, GuiState, SelectablePanel, color_conversion::IntoRatatuiColor,
+        components::Component, gui_state::Region,
+    },
 };
 use oxker_core::{AppColors, CoreCommand};
 use parking_lot::Mutex;
@@ -47,14 +50,14 @@ impl CommandsPanel {
 
         Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(block_color))
+            .border_style(Style::default().fg(block_color.into_ratatui_color()))
             .title(Span::styled(
                 " Commands ",
                 Style::default()
-                    .fg(highlight_color)
+                    .fg(highlight_color.into_ratatui_color())
                     .add_modifier(Modifier::BOLD),
             ))
-            .bg(props.theme.commands.background)
+            .bg(props.theme.commands.background.into_ratatui_color())
     }
 }
 
@@ -79,7 +82,7 @@ impl<'p> Component<'p> for CommandsPanel {
             .map(|command| {
                 let line = Line::from(vec![Span::styled(
                     command.to_string(),
-                    Style::default().fg(command.get_color(*props.theme)),
+                    Style::default().fg(command.get_color(*props.theme).into_ratatui_color()),
                 )]);
                 ListItem::new(line)
             })
@@ -108,7 +111,8 @@ impl<'p> Component<'p> for CommandsPanel {
     }
 
     fn handle_event(&mut self, _event: &Self::Event) -> Option<CoreCommand> {
-        // TODO: Implement when CoreCommand supports command execution
+        // Note: Command execution needs container context to map events to CoreCommand
+        // TODO: This should be handled by the parent component that has container state
         None
     }
 }

@@ -3,8 +3,8 @@
 use crate::{
     handlers::UIContainerState,
     ui::{
-        ContainerView, FrameViewModel, GuiState, SelectablePanel, components::Component,
-        gui_state::Region,
+        ContainerView, FrameViewModel, GuiState, SelectablePanel,
+        color_conversion::IntoRatatuiColor, components::Component, gui_state::Region,
     },
 };
 use oxker_core::{AppColors, CoreCommand};
@@ -41,7 +41,8 @@ impl ContainersPanel {
 
     /// Format a single container's data for display
     fn format_container(props: &ContainersPanelProps, container: &ContainerView) -> Line<'static> {
-        let state_style = Style::default().fg(container.state.get_color(*props.theme));
+        let state_style =
+            Style::default().fg(container.state.get_color(*props.theme).into_ratatui_color());
         let widths = &props.view_model.columns;
 
         Line::from(vec![
@@ -51,7 +52,7 @@ impl ContainersPanel {
                     container.name,
                     width = widths.name.1.into()
                 ),
-                Style::default().fg(props.theme.containers.text),
+                Style::default().fg(props.theme.containers.text.into_ratatui_color()),
             ),
             Span::styled(
                 format!(
@@ -93,7 +94,7 @@ impl ContainersPanel {
                     container.id.get_short(),
                     width = widths.id.1.into()
                 ),
-                Style::default().fg(props.theme.containers.text),
+                Style::default().fg(props.theme.containers.text.into_ratatui_color()),
             ),
             Span::styled(
                 format!(
@@ -101,7 +102,7 @@ impl ContainersPanel {
                     container.image,
                     width = widths.image.1.into()
                 ),
-                Style::default().fg(props.theme.containers.text),
+                Style::default().fg(props.theme.containers.text.into_ratatui_color()),
             ),
             Span::styled(
                 format!(
@@ -109,7 +110,7 @@ impl ContainersPanel {
                     container.rx,
                     width = widths.net_rx.1.into()
                 ),
-                Style::default().fg(props.theme.containers.text_rx),
+                Style::default().fg(props.theme.containers.text_rx.into_ratatui_color()),
             ),
             Span::styled(
                 format!(
@@ -117,7 +118,7 @@ impl ContainersPanel {
                     container.tx,
                     width = widths.net_tx.1.into()
                 ),
-                Style::default().fg(props.theme.containers.text_tx),
+                Style::default().fg(props.theme.containers.text_tx.into_ratatui_color()),
             ),
         ])
     }
@@ -135,14 +136,14 @@ impl ContainersPanel {
 
         Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(block_color))
+            .border_style(Style::default().fg(block_color.into_ratatui_color()))
             .title(Span::styled(
                 " Containers ",
                 Style::default()
-                    .fg(highlight_color)
+                    .fg(highlight_color.into_ratatui_color())
                     .add_modifier(Modifier::BOLD),
             ))
-            .bg(props.theme.containers.background)
+            .bg(props.theme.containers.background.into_ratatui_color())
     }
 }
 
@@ -199,7 +200,8 @@ impl<'p> Component<'p> for ContainersPanel {
     }
 
     fn handle_event(&mut self, _event: &Self::Event) -> Option<CoreCommand> {
-        // TODO: Implement when CoreCommand supports container operations
+        // Note: Container navigation events don't directly map to CoreCommands
+        // TODO: Validate that these are handled by the parent component's state management
         None
     }
 }

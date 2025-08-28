@@ -1,11 +1,11 @@
 //! Charts panel component for displaying CPU and memory usage graphs
 
-use crate::ui::{FrameViewModel, components::Component};
-use oxker_core::{AppColors, ByteStats, CpuStats, State, Stats};
+use crate::ui::{FrameViewModel, color_conversion::IntoRatatuiColor, components::Component};
+use oxker_core::{AppColors, ByteStats, CpuStats, State, Stats, config::Color as CoreColor};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style, Stylize},
+    style::{Modifier, Style, Stylize},
     symbols,
     text::Span,
     widgets::{Axis, Block, BorderType, Borders, Chart, Dataset, GraphType},
@@ -145,7 +145,7 @@ impl ChartVariant {
         }
     }
 
-    const fn get_title_color(self, colors: &AppColors, state: State) -> Color {
+    const fn get_title_color(self, colors: &AppColors, state: State) -> CoreColor {
         if state.is_healthy() {
             match self {
                 Self::Cpu => colors.chart_cpu.title,
@@ -156,28 +156,28 @@ impl ChartVariant {
         }
     }
 
-    const fn get_bg_color(self, colors: &AppColors) -> Color {
+    const fn get_bg_color(self, colors: &AppColors) -> CoreColor {
         match self {
             Self::Cpu => colors.chart_cpu.background,
             Self::Memory => colors.chart_memory.background,
         }
     }
 
-    const fn get_border_color(self, colors: &AppColors) -> Color {
+    const fn get_border_color(self, colors: &AppColors) -> CoreColor {
         match self {
             Self::Cpu => colors.chart_cpu.border,
             Self::Memory => colors.chart_memory.border,
         }
     }
 
-    const fn get_y_axis_color(self, colors: &AppColors) -> Color {
+    const fn get_y_axis_color(self, colors: &AppColors) -> CoreColor {
         match self {
             Self::Cpu => colors.chart_cpu.y_axis,
             Self::Memory => colors.chart_memory.y_axis,
         }
     }
 
-    const fn get_max_color(self, colors: &AppColors, state: State) -> Color {
+    const fn get_max_color(self, colors: &AppColors, state: State) -> CoreColor {
         if state.is_healthy() {
             match self {
                 Self::Cpu => colors.chart_cpu.max,
@@ -214,38 +214,46 @@ fn make_chart<'a, T: Stats + Display>(
     };
 
     Chart::new(dataset)
-        .bg(chart_variant.get_bg_color(colors))
-        .x_axis(
-            Axis::default()
-                .bounds(x_bounds)
-                .style(Style::default().fg(chart_variant.get_y_axis_color(colors))),
-        )
+        .bg(chart_variant.get_bg_color(colors).into_ratatui_color())
+        .x_axis(Axis::default().bounds(x_bounds).style(
+            Style::default().fg(chart_variant.get_y_axis_color(colors).into_ratatui_color()),
+        ))
         .y_axis(
             Axis::default()
                 .bounds(y_bounds)
-                .style(Style::default().fg(chart_variant.get_y_axis_color(colors)))
+                .style(
+                    Style::default()
+                        .fg(chart_variant.get_y_axis_color(colors).into_ratatui_color()),
+                )
                 .labels(vec![
-                    Span::styled("", Style::default().fg(max_color)),
+                    Span::styled("", Style::default().fg(max_color.into_ratatui_color())),
                     Span::styled(
                         format!("{max}"),
-                        Style::default().fg(max_color).add_modifier(Modifier::BOLD),
+                        Style::default()
+                            .fg(max_color.into_ratatui_color())
+                            .add_modifier(Modifier::BOLD),
                     ),
                 ])
                 .labels_alignment(Alignment::Left),
         )
         .block(
             Block::default()
-                .style(Style::default().bg(chart_variant.get_bg_color(colors)))
+                .style(Style::default().bg(chart_variant.get_bg_color(colors).into_ratatui_color()))
                 .title_alignment(Alignment::Center)
                 .title(Span::styled(
                     format!(" {} {current} ", chart_variant.name()),
                     Style::default()
-                        .fg(chart_variant.get_title_color(colors, state))
+                        .fg(chart_variant
+                            .get_title_color(colors, state)
+                            .into_ratatui_color())
                         .add_modifier(Modifier::BOLD),
                 ))
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(chart_variant.get_border_color(colors))),
+                .border_style(
+                    Style::default()
+                        .fg(chart_variant.get_border_color(colors).into_ratatui_color()),
+                ),
         )
 }
 
@@ -286,14 +294,14 @@ fn render_charts(
     let cpu_dataset = vec![
         Dataset::default()
             .marker(symbols::Marker::Dot)
-            .style(Style::default().fg(colors.chart_cpu.points))
+            .style(Style::default().fg(colors.chart_cpu.points.into_ratatui_color()))
             .graph_type(GraphType::Line)
             .data(&cpu_data),
     ];
     let mem_dataset = vec![
         Dataset::default()
             .marker(symbols::Marker::Dot)
-            .style(Style::default().fg(colors.chart_memory.points))
+            .style(Style::default().fg(colors.chart_memory.points.into_ratatui_color()))
             .graph_type(GraphType::Line)
             .data(&mem_data),
     ];

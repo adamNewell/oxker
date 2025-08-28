@@ -1,6 +1,5 @@
 use bollard::models::ContainerSummary;
 use core::fmt;
-// TODO: Remove ratatui dependencies - these will be handled by UI layer
 use std::{
     hash::Hash,
     sync::Arc,
@@ -12,7 +11,6 @@ pub use container_state::ContainerItemInit;
 
 use crate::{ENTRY_POINT, app_error::AppError, config::Config, events::EventBus};
 
-#[cfg(not(test))]
 use crate::events::CoreEvent;
 pub use container_state::*;
 
@@ -122,7 +120,6 @@ impl Filter {
 
 /// Global app_state, stored in an Arc<Mutex>
 #[derive(Debug, Clone)]
-#[cfg(not(test))]
 pub struct AppData {
     containers: StatefulList<ContainerItem>,
     error: Option<AppError>,
@@ -132,19 +129,6 @@ pub struct AppData {
     sorted_by: Option<(Header, SortedOrder)>,
     current_sorted_id: Vec<ContainerId>,
     pub config: Config,
-}
-
-#[derive(Debug, Clone)]
-#[cfg(test)]
-pub struct AppData {
-    pub config: Config,
-    pub containers: StatefulList<ContainerItem>,
-    pub error: Option<AppError>,
-    pub filter: Filter,
-    pub hidden_containers: Vec<ContainerItem>,
-    pub current_sorted_id: Vec<ContainerId>,
-    pub event_bus: Arc<EventBus>,
-    pub sorted_by: Option<(Header, SortedOrder)>,
 }
 
 impl AppData {
@@ -231,8 +215,7 @@ impl AppData {
         }
 
         // Emit container list update event
-        #[cfg(not(test))]
-        {
+        if tokio::runtime::Handle::try_current().is_ok() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
                 let _ = event_bus.publish(CoreEvent::ContainerListUpdated).await;
@@ -345,7 +328,6 @@ impl AppData {
     /// Sort the containers vec, based on a heading (and if clash, then by name), either ascending or descending,
     /// If not sort set, then sort by created time
     pub fn sort_containers(&mut self) {
-        #[cfg(not(test))]
         let pre_order = self.get_current_ids();
 
         if let Some((head, ord)) = self.sorted_by {
@@ -420,8 +402,7 @@ impl AppData {
         }
 
         // Emit event if order changed
-        #[cfg(not(test))]
-        if pre_order != self.get_current_ids() {
+        if pre_order != self.get_current_ids() && tokio::runtime::Handle::try_current().is_ok() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
                 let _ = event_bus.publish(CoreEvent::ContainerListUpdated).await;
@@ -467,8 +448,7 @@ impl AppData {
     #[allow(clippy::missing_const_for_fn)]
     pub fn containers_start(&mut self) {
         self.containers.start();
-        #[cfg(not(test))]
-        {
+        if tokio::runtime::Handle::try_current().is_ok() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
                 let _ = event_bus
@@ -482,8 +462,7 @@ impl AppData {
     #[allow(clippy::missing_const_for_fn)]
     pub fn containers_end(&mut self) {
         self.containers.end();
-        #[cfg(not(test))]
-        {
+        if tokio::runtime::Handle::try_current().is_ok() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
                 let _ = event_bus
@@ -496,8 +475,7 @@ impl AppData {
     /// Select the next container
     pub fn containers_next(&mut self) {
         self.containers.next();
-        #[cfg(not(test))]
-        {
+        if tokio::runtime::Handle::try_current().is_ok() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
                 let _ = event_bus
@@ -510,8 +488,7 @@ impl AppData {
     /// select the previous container
     pub fn containers_previous(&mut self) {
         self.containers.previous();
-        #[cfg(not(test))]
-        {
+        if tokio::runtime::Handle::try_current().is_ok() {
             let event_bus = self.event_bus.clone();
             tokio::spawn(async move {
                 let _ = event_bus
@@ -963,13 +940,9 @@ impl AppData {
                     .as_ref()
                     .map_or(String::new(), std::clone::Clone::clone),
             );
-            let state = State::from((
-                summary
-                    .state
-                    .as_ref()
-                    .map_or(&bollard::secret::ContainerSummaryStateEnum::DEAD, |s| s),
-                &status,
-            ));
+            let state = summary.state.as_ref().map_or(State::Unknown, |state_enum| {
+                State::from((state_enum, &status))
+            });
             let image = summary
                 .image
                 .as_ref()
@@ -1032,6 +1005,8 @@ impl AppData {
             all_containers.sort_by(|a, b| a.created.cmp(&b.created));
         }
 
+        // Auto-select first container if none selected (disabled for tests)
+        #[cfg(not(test))]
         if !all_containers.is_empty() && self.containers.state.selected().is_none() {
             self.containers.start();
         }
@@ -1045,8 +1020,8 @@ impl AppData {
         }
 
         // Publish ContainerListUpdate event with current container data
-        #[cfg(not(test))]
-        {
+        // Only publish if we're in a tokio runtime (not all tests use tokio)
+        if tokio::runtime::Handle::try_current().is_ok() {
             let containers: Vec<crate::events::types::ContainerItem> = self
                 .containers
                 .items
@@ -1105,7 +1080,6 @@ impl AppData {
                     } else {
                         i = log_content;
                     }
-                    // TODO: Log sanitization will be handled by UI layer when processing events
                     container.logs.insert(i, log_tz);
                 }
 

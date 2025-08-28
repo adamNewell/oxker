@@ -1,0 +1,5 @@
+---
+source: oxker-tui/tests/snapshot_tests.rs
+expression: output
+---
+ Esc  clear  ← by →   Name  Image  Status  All  term: running

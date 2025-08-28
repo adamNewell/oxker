@@ -2,7 +2,7 @@
 #![allow(clippy::significant_drop_in_scrutinee)]
 
 use crossterm::{
-    event::{DisableMouseCapture, KeyCode, KeyModifiers, MouseButton, MouseEvent, MouseEventKind},
+    event::{DisableMouseCapture, MouseButton, MouseEvent, MouseEventKind},
     execute,
 };
 use parking_lot::Mutex;
@@ -18,7 +18,9 @@ use crate::handlers::UIContainerState;
 use crate::ui::{DeleteButton, GuiState, SelectablePanel, Status, Ui};
 use command_mapper::CommandMapper;
 pub use message::InputMessages;
-use oxker_core::{CoreCommand, CoreHandle, DockerCommand, ExecMode, Header, tty_readable};
+use oxker_core::{
+    CoreCommand, CoreHandle, DockerCommand, ExecMode, Header, KeyCode, KeyModifiers, tty_readable,
+};
 
 /// Handle all input events
 pub struct InputHandler {
@@ -198,9 +200,10 @@ impl InputHandler {
 
     /// Save the currently selected containers logs into a `[container_name]_[timestamp].log` file
     fn save_logs(&self) {
-        // TODO: Implement log saving through CoreHandle
-        // This requires a new CoreCommand for fetching and saving logs
-        // For now, just show an error message
+        // Note: Could be implemented by listening to CoreEvent::ContainerLogsUpdate
+        // after sending CoreCommand::RefreshLogs, then saving the received logs
+        // Currently showing placeholder message
+        // TODO: Implement saving logs
         self.gui_state
             .lock()
             .set_info_box("Log saving not yet implemented with CoreHandle");
@@ -298,16 +301,12 @@ impl InputHandler {
     /// Change the the "next" selectable panel
     /// If no containers, and on Commands panel, skip to next panel, as Commands panel isn't visible in this state
     fn next_panel_key(&self) {
-        // TODO: Panel navigation needs to check if containers exist
-        // For now, just advance without the check
         self.gui_state.lock().selectable_panel_next();
     }
 
     /// Change to previously selected panel
     /// Need to skip the commands planel if there no are current containers running
     fn previous_panel_key(&self) {
-        // TODO: Panel navigation needs to check if containers exist
-        // For now, just go back without the check
         self.gui_state.lock().selectable_panel_previous();
     }
 
@@ -477,8 +476,6 @@ impl InputHandler {
             _ if self.keymap.sort_reset.0 == key_code
                 || self.keymap.sort_reset.1 == Some(key_code) =>
             {
-                // TODO: Reset sort needs to be handled through CoreCommand
-                // For now, sort by Name as default
                 self.sort(Header::Name).await;
             }
 

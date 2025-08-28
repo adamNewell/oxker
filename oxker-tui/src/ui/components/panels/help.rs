@@ -1,8 +1,11 @@
 //! Help panel component for displaying keyboard shortcuts and app info
 
-use crate::ui::components::{
-    Component,
-    constants::{DESCRIPTION, NAME_TEXT, REPO, VERSION},
+use crate::ui::{
+    color_conversion::IntoRatatuiColor,
+    components::{
+        Component,
+        constants::{DESCRIPTION, NAME_TEXT, REPO, VERSION},
+    },
 };
 use jiff::tz::TimeZone;
 use oxker_core::{AppColors, Keymap};
@@ -42,12 +45,15 @@ impl HelpPanel {
 
     /// Generate normal text span
     fn text_span(text: &str, theme: &AppColors) -> Span<'static> {
-        Self::span(text.to_string(), theme.popup_help.text)
+        Self::span(text.to_string(), theme.popup_help.text.into_ratatui_color())
     }
 
     /// Generate highlighted text span
     fn highlighted_span(text: &str, theme: &AppColors) -> Span<'static> {
-        Self::span(text.to_string(), theme.popup_help.text_highlight)
+        Self::span(
+            text.to_string(),
+            theme.popup_help.text_highlight.into_ratatui_color(),
+        )
     }
 
     /// Generate button item span
@@ -180,7 +186,7 @@ impl HelpPanel {
             Line::from(vec![Span::styled(
                 REPO,
                 Style::default()
-                    .fg(theme.popup_help.text_highlight)
+                    .fg(theme.popup_help.text_highlight.into_ratatui_color())
                     .add_modifier(Modifier::UNDERLINED),
             )]),
         ]
@@ -292,13 +298,13 @@ impl Component<'_> for HelpPanel {
             .border_type(BorderType::Rounded)
             .border_style(
                 Style::default()
-                    .fg(props.theme.popup_help.text)
-                    .bg(props.theme.popup_help.background),
+                    .fg(props.theme.popup_help.text.into_ratatui_color())
+                    .bg(props.theme.popup_help.background.into_ratatui_color()),
             )
             .style(
                 Style::default()
-                    .bg(props.theme.popup_help.background)
-                    .fg(props.theme.popup_help.text),
+                    .bg(props.theme.popup_help.background.into_ratatui_color())
+                    .fg(props.theme.popup_help.text.into_ratatui_color()),
             );
         frame.render_widget(block, help_area);
 
@@ -307,8 +313,8 @@ impl Component<'_> for HelpPanel {
         let name_paragraph = Paragraph::new(name_lines)
             .style(
                 Style::default()
-                    .bg(props.theme.popup_help.background)
-                    .fg(props.theme.popup_help.text_highlight),
+                    .bg(props.theme.popup_help.background.into_ratatui_color())
+                    .fg(props.theme.popup_help.text_highlight.into_ratatui_color()),
             )
             .alignment(Alignment::Center);
         frame.render_widget(name_paragraph, sections[0]);
@@ -317,8 +323,8 @@ impl Component<'_> for HelpPanel {
         let description_paragraph = Paragraph::new(description_lines)
             .style(
                 Style::default()
-                    .bg(props.theme.popup_help.background)
-                    .fg(props.theme.popup_help.text_highlight),
+                    .bg(props.theme.popup_help.background.into_ratatui_color())
+                    .fg(props.theme.popup_help.text_highlight.into_ratatui_color()),
             )
             .alignment(Alignment::Center);
         frame.render_widget(description_paragraph, sections[1]);
@@ -328,8 +334,8 @@ impl Component<'_> for HelpPanel {
             let timezone_paragraph = Paragraph::new(timezone_lines)
                 .style(
                     Style::default()
-                        .bg(props.theme.popup_help.background)
-                        .fg(props.theme.popup_help.text),
+                        .bg(props.theme.popup_help.background.into_ratatui_color())
+                        .fg(props.theme.popup_help.text.into_ratatui_color()),
                 )
                 .alignment(Alignment::Center);
             frame.render_widget(timezone_paragraph, sections[2]);
@@ -339,8 +345,8 @@ impl Component<'_> for HelpPanel {
         let keymap_paragraph = Paragraph::new(keymap_lines)
             .style(
                 Style::default()
-                    .bg(props.theme.popup_help.background)
-                    .fg(props.theme.popup_help.text),
+                    .bg(props.theme.popup_help.background.into_ratatui_color())
+                    .fg(props.theme.popup_help.text.into_ratatui_color()),
             )
             .alignment(Alignment::Left);
         frame.render_widget(keymap_paragraph, sections[3]);
@@ -349,8 +355,8 @@ impl Component<'_> for HelpPanel {
         let info_paragraph = Paragraph::new(info_lines)
             .style(
                 Style::default()
-                    .bg(props.theme.popup_help.background)
-                    .fg(props.theme.popup_help.text),
+                    .bg(props.theme.popup_help.background.into_ratatui_color())
+                    .fg(props.theme.popup_help.text.into_ratatui_color()),
             )
             .alignment(Alignment::Center);
         frame.render_widget(info_paragraph, sections[4]);

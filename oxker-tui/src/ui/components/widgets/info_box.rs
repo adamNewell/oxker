@@ -1,6 +1,9 @@
 //! Info box widget for displaying temporary status messages
 
-use crate::ui::components::{Component, layout::ModalOverlay};
+use crate::ui::{
+    color_conversion::IntoRatatuiColor,
+    components::{Component, layout::ModalOverlay},
+};
 use oxker_core::AppColors;
 use ratatui::{
     Frame,
@@ -72,19 +75,19 @@ impl<'p> Component<'p> for InfoBox {
         // Create the info box block
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_style(Style::default().fg(props.theme.borders.unselected))
+            .border_style(Style::default().fg(props.theme.borders.unselected.into_ratatui_color()))
             .title(Line::from(vec![
                 ratatui::text::Span::raw(" "),
                 ratatui::text::Span::styled(
                     "Info",
-                    Style::default().fg(props.theme.popup_info.text),
+                    Style::default().fg(props.theme.popup_info.text.into_ratatui_color()),
                 ),
                 ratatui::text::Span::raw(" "),
             ]));
 
         // Create the content paragraph
         let content = Paragraph::new(props.message)
-            .style(Style::default().fg(props.theme.popup_info.text))
+            .style(Style::default().fg(props.theme.popup_info.text.into_ratatui_color()))
             .alignment(Alignment::Center)
             .wrap(Wrap { trim: true })
             .block(block);

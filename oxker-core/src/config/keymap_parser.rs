@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crossterm::event::{KeyCode, KeyModifiers};
+use crate::keys::{KeyCode, KeyModifiers};
 
 /// The macro accepts a list of struct names with key names
 /// Returns a struct where every key name is an Option<String>, with the correct derived attributes
@@ -365,9 +365,8 @@ impl Keymap {
 
 #[cfg(test)]
 mod tests {
-    use crossterm::event::{KeyCode, KeyModifiers};
-
     use crate::config::keymap_parser::ConfigKeymap;
+    use crate::keys::{KeyCode, KeyModifiers};
 
     use super::Keymap;
 
