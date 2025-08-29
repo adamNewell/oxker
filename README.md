@@ -137,7 +137,6 @@ Available command line arguments
 |```--no-stderr```| Do not include stderr output in logs.|
 |```--save-dir [string]```| Save exported logs into a custom directory. Defaults to `$HOME`.|
 |```--timezone [string]```| Display the Docker logs timestamps in a given [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). Defaults to `Etc/UTC`.|
-|```--use-cli```| Use the Docker application when exec-ing into a container, instead of the Docker API.|
 
 ### Config File
 

@@ -40,7 +40,6 @@ pub mod test_utils {
                     raw_logs: false,
                     show_std_err: false,
                     host: None,
-                    use_cli: false,
                 },
             }
         }
@@ -340,7 +339,6 @@ pub mod test_utils {
             keymap: Keymap::new(),
             timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             show_timestamp: false,
-            use_cli: false,
             show_logs: true,
             timezone: None,
         }

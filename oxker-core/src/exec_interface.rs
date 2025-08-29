@@ -1,7 +1,5 @@
-use crate::{AppError, ContainerId};
+use crate::AppError;
 use async_trait::async_trait;
-use bollard::Docker;
-use std::sync::Arc;
 
 /// Represents the terminal dimensions for exec sessions
 #[derive(Debug, Clone, Copy)]
@@ -77,33 +75,6 @@ pub trait TerminalHandler: Send + Sync {
 
     /// Check if TTY is available
     fn is_tty_available(&self) -> bool;
-}
-
-/// Represents an exec session
-#[derive(Debug, Clone)]
-pub struct ExecSession {
-    pub container_id: Arc<ContainerId>,
-    pub docker: Arc<Docker>,
-    pub use_cli: bool,
-}
-
-impl ExecSession {
-    /// Create a new exec session
-    #[must_use]
-    pub const fn new(container_id: Arc<ContainerId>, docker: Arc<Docker>, use_cli: bool) -> Self {
-        Self {
-            container_id,
-            docker,
-            use_cli,
-        }
-    }
-}
-
-/// Mode of execution (internal via Bollard or external via Docker CLI)
-#[derive(Debug, Clone)]
-pub enum ExecMode {
-    Internal(ExecSession),
-    External(Arc<ContainerId>),
 }
 
 /// Security module for TTY input sanitization
@@ -285,7 +256,7 @@ pub mod security {
 #[cfg(test)]
 mod interface_tests {
     use super::*;
-    use std::sync::Mutex;
+    use std::sync::{Arc, Mutex};
 
     struct MockExecInterface {
         output: Arc<Mutex<Vec<Vec<u8>>>>,
@@ -433,19 +404,6 @@ mod interface_tests {
         let dims2 = dims;
         assert_eq!(dims2.width, 120);
         assert_eq!(dims2.height, 40);
-    }
-
-    #[test]
-    fn test_exec_mode() {
-        use crate::app_data::ContainerId;
-        let id = Arc::new(ContainerId::from("test-container"));
-
-        // Test External mode
-        let external = ExecMode::External(id);
-        match &external {
-            ExecMode::External(cid) => assert_eq!(cid.get(), "test-container"),
-            ExecMode::Internal(_) => panic!("Wrong mode"),
-        }
     }
 
     #[tokio::test]

@@ -37,9 +37,6 @@ timestamp_format = "%Y-%m-%dT%H:%M:%S.%8f"
 # Directory for saving exported logs, defaults to `$HOME`, this is automatically *correctly* calculated for Linux, Mac, and Windows
 # save_dir = "$HOME"
 
-# Force use of docker cli when execing into containers, honestly mostly pointless
-use_cli = false
-
 # Show the logs section - this can be changed during operation with the log_section_toggle key
 show_logs = true
 

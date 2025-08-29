@@ -28,7 +28,7 @@ pub use app_error::AppError;
 pub use config::{AppColors, Config, Keymap};
 pub use docker_data::{DockerData, DockerMessage};
 pub use events::{CoreCommand, CoreEvent, EventBus};
-pub use exec::{ExecMode, tty_readable};
+pub use exec::{exec_docker_cli, tty_readable};
 pub use exec_interface::{ExecInterface, TerminalDimensions, TerminalHandler};
 pub use handle::{CoreHandle, CoreStateView};
 pub use keys::{KeyCode, KeyModifiers};
@@ -63,7 +63,6 @@ pub mod tests {
             keymap: Keymap::new(),
             timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             show_timestamp: false,
-            use_cli: false,
             show_logs: true,
             timezone: None,
         }

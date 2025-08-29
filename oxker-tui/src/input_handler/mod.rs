@@ -19,7 +19,7 @@ use crate::ui::{DeleteButton, GuiState, SelectablePanel, Status, Ui};
 use command_mapper::CommandMapper;
 pub use message::InputMessages;
 use oxker_core::{
-    CoreCommand, CoreHandle, DockerCommand, ExecMode, Header, KeyCode, KeyModifiers, tty_readable,
+    CoreCommand, CoreHandle, DockerCommand, Header, KeyCode, KeyModifiers, tty_readable,
 };
 
 /// Handle all input events
@@ -163,10 +163,9 @@ impl InputHandler {
             };
 
             if let Some(id) = container_id {
-                // Create ExecMode with the container ID
-                // For now, always use External mode (docker CLI)
-                let exec_mode = ExecMode::External(Arc::new(id));
-                self.gui_state.lock().set_exec_mode(exec_mode);
+                // Set the exec container ID in the GUI state
+                self.gui_state.lock().set_exec_container_id(Some(id));
+                self.gui_state.lock().status_push(Status::Exec);
             } else {
                 self.gui_state.lock().set_info_box("No container selected");
             }

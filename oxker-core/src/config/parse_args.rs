@@ -48,10 +48,6 @@ pub struct Args {
     /// Path to a config file, readable as TOML, JSONC, or JSON
     #[clap(long="config-file", short = None)]
     pub config_file: Option<String>,
-
-    /// Force use of docker cli when execing into containers
-    #[clap(long="use-cli", short = None)]
-    pub use_cli: bool,
 }
 
 impl Default for Args {
@@ -68,7 +64,6 @@ impl Default for Args {
             timezone: None,
             save_dir: None,
             config_file: None,
-            use_cli: false,
         }
     }
 }

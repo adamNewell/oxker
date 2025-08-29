@@ -74,7 +74,6 @@ pub struct ConfigFile {
     pub show_timestamp: Option<bool>,
     pub timestamp_format: Option<String>,
     pub timezone: Option<String>,
-    pub use_cli: Option<bool>,
     pub show_logs: Option<bool>,
 }
 

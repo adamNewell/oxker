@@ -8,7 +8,7 @@ use std::{
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use oxker_core::{ContainerId, ExecMode, Header};
+use oxker_core::{ContainerId, Header};
 
 use super::Rerender;
 
@@ -83,7 +83,7 @@ pub enum Status {
 #[derive(Debug)]
 pub struct GuiState {
     delete_container_id: Option<ContainerId>,
-    exec_mode: Option<ExecMode>,
+    exec_container_id: Option<ContainerId>,
     intersect_delete: HashMap<DeleteButton, Rect>,
     intersect_heading: HashMap<Header, Rect>,
     intersect_help: Option<Rect>,
@@ -106,7 +106,7 @@ impl GuiState {
     pub fn new(redraw: &Arc<Rerender>, show_logs: bool) -> Self {
         Self {
             delete_container_id: None,
-            exec_mode: None,
+            exec_container_id: None,
             info_box_text: None,
             intersect_delete: HashMap::new(),
             intersect_heading: HashMap::new(),
@@ -303,34 +303,27 @@ impl GuiState {
                 self.status.remove(&Status::DeleteConfirm);
             }
             Status::Exec => {
-                self.exec_mode = None;
+                self.exec_container_id = None;
             }
             _ => (),
         }
         self.rerender.update_draw();
     }
 
-    /// Inset the ExecMode into self, and set the Status as exec
-    /// Using StatusPush with Status::Exec won't insert into the hash map
-    /// To force self.exec_mode to be set
-    pub fn set_exec_mode(&mut self, mode: ExecMode) {
-        self.exec_mode = Some(mode);
-        self.status.insert(Status::Exec);
-        self.rerender.update_draw();
+    /// Set the exec container ID
+    pub fn set_exec_container_id(&mut self, id: Option<ContainerId>) {
+        self.exec_container_id = id;
     }
 
     #[must_use]
-    pub fn get_exec_mode(&self) -> Option<ExecMode> {
-        self.exec_mode.clone()
+    pub fn get_exec_container_id(&self) -> Option<ContainerId> {
+        self.exec_container_id.clone()
     }
 
     /// Insert a gui_status into the current gui_status HashSet
-    /// If the status is Exec, it won't get inserted, set_exec_mode() should be used instead
     pub fn status_push(&mut self, status: Status) {
-        if status != Status::Exec {
-            self.status.insert(status);
-            self.rerender.update_draw();
-        }
+        self.status.insert(status);
+        self.rerender.update_draw();
     }
 
     /// Change to next selectable panel

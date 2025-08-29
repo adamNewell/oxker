@@ -32,7 +32,6 @@ pub struct Config {
     pub timezone: Option<TimeZone>,
     pub timestamp_format: String,
     pub show_logs: bool,
-    pub use_cli: bool,
 }
 
 impl From<&Args> for Config {
@@ -52,7 +51,6 @@ impl From<&Args> for Config {
             show_timestamp: !args.timestamp,
             timezone: Self::parse_timezone(args.timezone.clone()),
             timestamp_format: Self::parse_timestamp_format(None),
-            use_cli: args.use_cli,
             show_logs: true,
         }
     }
@@ -75,7 +73,6 @@ impl From<ConfigFile> for Config {
             show_timestamp: config_file.show_timestamp.unwrap_or(true),
             timezone: Self::parse_timezone(config_file.timezone),
             timestamp_format: Self::parse_timestamp_format(config_file.timestamp_format),
-            use_cli: config_file.use_cli.unwrap_or(false),
             show_logs: config_file.show_logs.unwrap_or(true),
         }
     }
@@ -170,10 +167,6 @@ impl Config {
 
         if config_from_cli.show_timestamp != default_args.timestamp {
             self.show_timestamp = config_from_cli.show_timestamp;
-        }
-
-        if config_from_cli.use_cli != default_args.use_cli {
-            self.use_cli = config_from_cli.use_cli;
         }
 
         if let Some(host) = config_from_cli.host {

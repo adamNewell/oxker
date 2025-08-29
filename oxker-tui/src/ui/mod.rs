@@ -17,7 +17,6 @@ use tracing::error;
 
 // draw_blocks module removed - functionality migrated to components
 pub mod color_conversion;
-mod exec_integration;
 mod gui_state;
 mod redraw;
 mod view_models;
@@ -190,13 +189,14 @@ impl Ui {
         }
     }
     /// Use external docker cli to exec into a container
-    async fn exec(&mut self) {
-        let exec_mode = self.gui_state.lock().get_exec_mode();
+    fn exec(&mut self) {
+        let container_id = self.gui_state.lock().get_exec_container_id();
 
-        if let Some(mode) = exec_mode {
+        if let Some(id) = container_id {
             self.reset_terminal().ok();
             self.terminal.clear().ok();
-            if let Err(_e) = exec_integration::run_exec_mode(mode, &self.terminal).await {
+            // Use the simplified exec_docker_cli function directly
+            if let Err(_e) = oxker_core::exec_docker_cli(&id) {
                 // Future enhancement: Could publish error events to event bus for detailed error handling
                 self.gui_state.lock().status_push(Status::Error);
             }
@@ -265,7 +265,7 @@ impl Ui {
                     let exec = fd.status.contains(&Status::Exec);
 
                     if exec {
-                        self.exec().await;
+                        self.exec();
                     } else if self
                         .terminal
                         .draw(|frame| {

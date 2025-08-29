@@ -60,7 +60,6 @@ impl MockCoreHandle {
             keymap: Keymap::new(),
             timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             show_timestamp: false,
-            use_cli: false,
             show_logs: true,
             timezone: None,
         }
