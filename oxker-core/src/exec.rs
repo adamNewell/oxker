@@ -79,7 +79,7 @@ pub fn exec_docker_cli(id: &ContainerId) -> Result<(), AppError> {
         })?;
 
     let status = child.wait().map_err(|_| AppError::Terminal)?;
-    
+
     // Check if the command executed successfully
     if !status.success() {
         // Check if container was not found or not running
@@ -87,7 +87,7 @@ pub fn exec_docker_cli(id: &ContainerId) -> Result<(), AppError> {
         // but we can provide a general error message that covers both cases
         return Err(AppError::DockerExec);
     }
-    
+
     Ok(())
 }
 

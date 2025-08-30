@@ -119,12 +119,12 @@ async fn test_multiple_commands_and_events() {
         .any(|e| matches!(e, CoreEvent::ContainerListUpdate(_)));
 
     assert!(has_list_update, "Missing ContainerListUpdate event");
-    
+
     // Log update is optional - depends on whether the container exists
     let has_logs_update = events
         .iter()
         .any(|e| matches!(e, CoreEvent::ContainerLogsUpdate { .. }));
-    
+
     if has_logs_update {
         eprintln!("Also received ContainerLogsUpdate event");
     }

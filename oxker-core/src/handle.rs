@@ -196,18 +196,18 @@ impl CoreHandle {
         filter_field: crate::events::types::FilterField,
     ) -> Result<(), String> {
         use crate::events::types::FilterField;
-        
+
         // Update filter in AppData and get filtered containers
         let event_containers = {
             let mut app_data = self.app_data.lock();
-            
+
             // Set or clear the filter
             if filter_text.is_empty() {
                 app_data.set_filter_term(None);
             } else {
                 app_data.set_filter_term(Some(filter_text.to_lowercase()));
             }
-            
+
             // Map FilterField to FilterBy
             let filter_by = match filter_field {
                 FilterField::Name => FilterBy::Name,
@@ -216,12 +216,12 @@ impl CoreHandle {
                 FilterField::All => FilterBy::All,
             };
             app_data.set_filter_by(filter_by);
-            
+
             // Apply the filter and sort, then get resulting items
             app_data.filter_containers();
             // Sort containers if a sort is configured (AppData defaults to Name ascending)
             app_data.sort_containers();
-            
+
             Self::convert_to_event_containers(app_data.get_container_items())
         }; // Drop lock before await
 
@@ -235,8 +235,8 @@ impl CoreHandle {
         sort_field: crate::events::types::SortField,
         sort_order: crate::events::types::SortOrder,
     ) -> Result<(), String> {
-        use crate::events::types::{SortField, SortOrder};
         use crate::app_data::SortedOrder;
+        use crate::events::types::{SortField, SortOrder};
 
         // Map SortField to Header
         let header = match sort_field {
@@ -357,7 +357,8 @@ impl CoreHandle {
                     .await?;
             }
             CoreCommand::FilterContainers(filter_text, filter_field) => {
-                self.handle_filter_containers(&filter_text, filter_field).await?;
+                self.handle_filter_containers(&filter_text, filter_field)
+                    .await?;
             }
             CoreCommand::SortContainers(sort_field, sort_order) => {
                 self.handle_sort_containers(sort_field, sort_order).await?;

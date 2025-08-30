@@ -131,7 +131,9 @@ pub mod tests {
                 let image = Some(item.image.get().to_string());
                 let image_id = Some(format!("{}_image_id", item.id.get()));
                 let command = Some(format!("{}_command", item.id.get()));
-                let created = Some(i64::try_from(item.created).unwrap_or_else(|_| i64::try_from(i).unwrap_or(0)));
+                let created = Some(
+                    i64::try_from(item.created).unwrap_or_else(|_| i64::try_from(i).unwrap_or(0)),
+                );
                 let ports = Some(
                     item.ports
                         .iter()

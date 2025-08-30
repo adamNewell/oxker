@@ -166,7 +166,7 @@ impl UIEventHandler {
         {
             let mut gui_state = self.gui_state.lock();
             gui_state.status_del(Status::Logs);
-            
+
             // Only auto-scroll to bottom if:
             // 1. This is the first set of logs (previous_log_count == 0), OR
             // 2. User was already at the bottom (sticky bottom behavior)

@@ -12,7 +12,7 @@ fn create_test_gui_state() -> Arc<Mutex<GuiState>> {
 #[test]
 fn test_default_sort_by_name_ascending() {
     let ui_state = UIContainerState::new();
-    
+
     // Verify default sort is set to Name ascending
     assert_eq!(ui_state.sort_header, Some(oxker_core::Header::Name));
     assert!(ui_state.sort_ascending);
@@ -22,13 +22,9 @@ fn test_default_sort_by_name_ascending() {
 fn test_sort_visual_indicators() {
     let ui_state = UIContainerState::new();
     let gui_state = create_test_gui_state();
-    let view_model = FrameViewModel::from_state(
-        &ui_state,
-        &gui_state.lock().unwrap(),
-        AppColors::new(),
-        120,
-    );
-    
+    let view_model =
+        FrameViewModel::from_state(&ui_state, &gui_state.lock().unwrap(), AppColors::new(), 120);
+
     // Verify sorted_by is set correctly in view model
     assert!(view_model.sorted_by.is_some());
     if let Some((header, order)) = view_model.sorted_by {
@@ -40,16 +36,16 @@ fn test_sort_visual_indicators() {
 #[test]
 fn test_confirmation_modal_state() {
     let gui_state = create_test_gui_state();
-    
+
     // Test setting command confirmation
     gui_state.lock().unwrap().set_command_confirm(Some((
         oxker_core::DockerCommand::Delete,
         oxker_core::ContainerId::from("test-id"),
     )));
-    
+
     // Verify state is tracked
     assert!(gui_state.lock().unwrap().get_command_confirm().is_some());
-    
+
     // Test clearing confirmation
     gui_state.lock().unwrap().set_command_confirm(None);
     assert!(gui_state.lock().unwrap().get_command_confirm().is_none());
@@ -59,7 +55,7 @@ fn test_confirmation_modal_state() {
 fn test_logs_panel_title_format() {
     let mut ui_state = UIContainerState::new();
     let gui_state = create_test_gui_state();
-    
+
     // Add test container
     let containers = vec![oxker_core::events::types::ContainerItem {
         id: "test-123".to_string(),
@@ -69,9 +65,9 @@ fn test_logs_panel_title_format() {
         status: "Up 5 minutes".to_string(),
         ports: vec![],
     }];
-    
+
     ui_state.update_containers(containers);
-    
+
     // Add some logs
     ui_state.add_logs(
         "test-123",
@@ -88,14 +84,10 @@ fn test_logs_panel_title_format() {
             },
         ],
     );
-    
-    let view_model = FrameViewModel::from_state(
-        &ui_state,
-        &gui_state.lock().unwrap(),
-        AppColors::new(),
-        120,
-    );
-    
+
+    let view_model =
+        FrameViewModel::from_state(&ui_state, &gui_state.lock().unwrap(), AppColors::new(), 120);
+
     // Verify log title contains container name and image
     assert!(view_model.log_view.title.contains("test-container"));
     assert!(view_model.log_view.title.contains("nginx:latest"));
@@ -105,15 +97,18 @@ fn test_logs_panel_title_format() {
 fn test_default_log_position_at_bottom() {
     let gui_state = create_test_gui_state();
     let mut ui_state = UIContainerState::new();
-    
+
     // Add logs
     for i in 0..10 {
         ui_state.logs.push_back(format!("Log entry {i}"));
     }
-    
+
     // When logs are added, position should be at bottom
-    gui_state.lock().unwrap().set_ui_logs_position(ui_state.logs.len().saturating_sub(1));
-    
+    gui_state
+        .lock()
+        .unwrap()
+        .set_ui_logs_position(ui_state.logs.len().saturating_sub(1));
+
     let position = gui_state.lock().unwrap().get_ui_logs_position();
     assert_eq!(position, 9); // Last index for 10 logs
 }
@@ -122,7 +117,7 @@ fn test_default_log_position_at_bottom() {
 fn test_container_column_spacing() {
     let ui_state = UIContainerState::new();
     let gui_state = create_test_gui_state();
-    
+
     // Test with different screen widths
     for width in [80, 120, 200] {
         let view_model = FrameViewModel::from_state(
@@ -131,10 +126,10 @@ fn test_container_column_spacing() {
             AppColors::new(),
             width,
         );
-        
+
         // Verify columns have consistent widths
         let columns = &view_model.columns;
-        
+
         // Fixed width columns should be consistent
         assert_eq!(columns.cpu.1, 8);
         assert_eq!(columns.id.1, 8);
@@ -146,33 +141,41 @@ fn test_container_column_spacing() {
 #[test]
 fn test_search_mode_activation() {
     let gui_state = create_test_gui_state();
-    
+
     // Activate search/filter mode
     gui_state.lock().unwrap().status_push(Status::Filter);
-    
+
     // Verify search mode is active
-    assert!(gui_state.lock().unwrap().get_status().contains(&Status::Filter));
-    
+    assert!(
+        gui_state
+            .lock()
+            .unwrap()
+            .get_status()
+            .contains(&Status::Filter)
+    );
+
     // Deactivate search mode
     gui_state.lock().unwrap().status_del(Status::Filter);
-    assert!(!gui_state.lock().unwrap().get_status().contains(&Status::Filter));
+    assert!(
+        !gui_state
+            .lock()
+            .unwrap()
+            .get_status()
+            .contains(&Status::Filter)
+    );
 }
 
 #[test]
 fn test_filter_visual_feedback() {
     let mut ui_state = UIContainerState::new();
     let gui_state = create_test_gui_state();
-    
+
     // Set filter term
     ui_state.set_filter_term("nginx".to_string());
-    
-    let view_model = FrameViewModel::from_state(
-        &ui_state,
-        &gui_state.lock().unwrap(),
-        AppColors::new(),
-        120,
-    );
-    
+
+    let view_model =
+        FrameViewModel::from_state(&ui_state, &gui_state.lock().unwrap(), AppColors::new(), 120);
+
     // Verify filter term is present in view model
     assert!(view_model.filter_term.is_some());
     assert_eq!(view_model.filter_term.unwrap(), "nginx");
@@ -181,11 +184,11 @@ fn test_filter_visual_feedback() {
 #[test]
 fn test_sort_state_persistence() {
     let mut ui_state = UIContainerState::new();
-    
+
     // Set initial sort
     ui_state.sort_header = Some(oxker_core::Header::Cpu);
     ui_state.sort_ascending = false;
-    
+
     // Update containers
     let containers = vec![
         oxker_core::events::types::ContainerItem {
@@ -205,9 +208,9 @@ fn test_sort_state_persistence() {
             ports: vec![],
         },
     ];
-    
+
     ui_state.update_containers(containers);
-    
+
     // Verify sort state persisted
     assert_eq!(ui_state.sort_header, Some(oxker_core::Header::Cpu));
     assert!(!ui_state.sort_ascending);
@@ -216,23 +219,26 @@ fn test_sort_state_persistence() {
 #[test]
 fn test_confirmation_modal_flow() {
     let gui_state = create_test_gui_state();
-    
+
     // Set up confirmation
     let container_id = oxker_core::ContainerId::from("test-container");
     let command = oxker_core::DockerCommand::Stop;
-    
-    gui_state.lock().unwrap().set_command_confirm(Some((command, container_id.clone())));
-    
+
+    gui_state
+        .lock()
+        .unwrap()
+        .set_command_confirm(Some((command, container_id.clone())));
+
     // Verify confirmation state is set
     let confirm_state = gui_state.lock().unwrap().get_command_confirm();
     assert!(confirm_state.is_some());
-    
+
     // Simulate confirmation
     if let Some((cmd, id)) = confirm_state {
         assert_eq!(cmd, oxker_core::DockerCommand::Stop);
         assert_eq!(id, container_id);
     }
-    
+
     // Clear confirmation (cancel)
     gui_state.lock().unwrap().set_command_confirm(None);
     assert!(gui_state.lock().unwrap().get_command_confirm().is_none());
@@ -242,24 +248,23 @@ fn test_confirmation_modal_flow() {
 fn test_visual_indicators_in_view_model() {
     let mut ui_state = UIContainerState::new();
     let gui_state = create_test_gui_state();
-    
+
     // Set various states that should have visual indicators
     ui_state.sort_header = Some(oxker_core::Header::Memory);
     ui_state.sort_ascending = false;
     ui_state.set_filter_term("test".to_string());
     gui_state.lock().unwrap().status_push(Status::Filter);
     // Loading state is tracked differently - just check filter status
-    
-    let view_model = FrameViewModel::from_state(
-        &ui_state,
-        &gui_state.lock().unwrap(),
-        AppColors::new(),
-        120,
-    );
-    
+
+    let view_model =
+        FrameViewModel::from_state(&ui_state, &gui_state.lock().unwrap(), AppColors::new(), 120);
+
     // Verify all visual indicators are present
     assert!(view_model.sorted_by.is_some());
-    assert_eq!(view_model.sorted_by.unwrap().1, oxker_core::SortedOrder::Desc);
+    assert_eq!(
+        view_model.sorted_by.unwrap().1,
+        oxker_core::SortedOrder::Desc
+    );
     assert!(view_model.filter_term.is_some());
     assert!(view_model.status.contains(&Status::Filter));
 }
@@ -268,50 +273,50 @@ fn test_visual_indicators_in_view_model() {
 fn test_logs_sticky_bottom_behavior() {
     let gui_state = create_test_gui_state();
     let mut ui_state = UIContainerState::new();
-    
+
     // Add initial logs
     for i in 0..5 {
         ui_state.logs.push_back(format!("Log {i}"));
     }
-    
+
     // Position at bottom
     gui_state.lock().unwrap().set_ui_logs_position(4);
-    
+
     // Add more logs
     for i in 5..10 {
         ui_state.logs.push_back(format!("Log {i}"));
     }
-    
+
     // If we were at bottom, we should stay at bottom (sticky)
     // This would be handled by the logs update logic
     let max_logs = ui_state.logs.len();
     gui_state.lock().unwrap().set_ui_logs_position(max_logs - 1);
-    
+
     assert_eq!(gui_state.lock().unwrap().get_ui_logs_position(), 9);
 }
 
 #[test]
 fn test_filter_field_navigation() {
     let mut ui_state = UIContainerState::new();
-    
+
     // Test next filter field navigation
     ui_state.filter_by = oxker_core::Header::Id; // All
     ui_state.next_filter_field();
     assert_eq!(ui_state.filter_by, oxker_core::Header::Name);
-    
+
     ui_state.next_filter_field();
     assert_eq!(ui_state.filter_by, oxker_core::Header::Image);
-    
+
     ui_state.next_filter_field();
     assert_eq!(ui_state.filter_by, oxker_core::Header::Status);
-    
+
     // Test previous filter field navigation
     ui_state.prev_filter_field();
     assert_eq!(ui_state.filter_by, oxker_core::Header::Image);
-    
+
     ui_state.prev_filter_field();
     assert_eq!(ui_state.filter_by, oxker_core::Header::Name);
-    
+
     ui_state.prev_filter_field();
     assert_eq!(ui_state.filter_by, oxker_core::Header::Id); // Back to All
 }

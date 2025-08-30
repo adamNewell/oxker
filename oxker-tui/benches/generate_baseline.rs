@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used)]
 
-use std::fs::File;
 use std::fmt::Write as FmtWrite;
+use std::fs::File;
 use std::io::Write;
 use std::time::{Duration, Instant};
 

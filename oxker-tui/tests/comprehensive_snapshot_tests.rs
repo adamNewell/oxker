@@ -770,11 +770,13 @@ fn test_combined_ui_layouts() {
             // Render charts
             let charts_panel = ChartsPanel::new();
             let cpu_data = [20.0, 25.0, 30.0, 28.0, 26.0];
-            let mem_data = [ByteStats::new(100 * 1024 * 1024),
+            let mem_data = [
+                ByteStats::new(100 * 1024 * 1024),
                 ByteStats::new(120 * 1024 * 1024),
                 ByteStats::new(115 * 1024 * 1024),
                 ByteStats::new(125 * 1024 * 1024),
-                ByteStats::new(118 * 1024 * 1024)];
+                ByteStats::new(118 * 1024 * 1024),
+            ];
 
             let cpu_chart_data: Vec<(f64, f64)> = cpu_data
                 .iter()

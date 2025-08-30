@@ -16,7 +16,7 @@ pub mod ports;
 // Re-export panel components
 pub use charts::ChartsPanel;
 pub use commands::CommandsPanel;
-pub use confirmation_modal::{ConfirmationModal, ConfirmationButton};
+pub use confirmation_modal::{ConfirmationButton, ConfirmationModal};
 pub use containers::ContainersPanel;
 pub use delete_confirm::DeleteConfirmPanel;
 pub use error::ErrorPanel;

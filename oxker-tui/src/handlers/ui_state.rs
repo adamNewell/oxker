@@ -52,7 +52,7 @@ impl UIContainerState {
             filter_term: String::new(),
             filter_by: Header::Id, // Using Id to represent "All" - default filter
             sort_header: Some(Header::Name), // Default sort by name
-            sort_ascending: true, // Default to ascending order (should show ▲)
+            sort_ascending: true,  // Default to ascending order (should show ▲)
             version: 0,
             last_significant_change: 0,
         }
@@ -419,9 +419,14 @@ impl UIContainerState {
     pub const fn next_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
             Header::Id => Header::Name,      // All -> Name
-            Header::Name => Header::Image,    // Name -> Image
-            Header::Image => Header::Status,  // Image -> Status
-            Header::Status | Header::State | Header::Cpu | Header::Memory | Header::Rx | Header::Tx => {
+            Header::Name => Header::Image,   // Name -> Image
+            Header::Image => Header::Status, // Image -> Status
+            Header::Status
+            | Header::State
+            | Header::Cpu
+            | Header::Memory
+            | Header::Rx
+            | Header::Tx => {
                 Header::Id // Status -> All (wrap around), Default to All
             }
         };
@@ -429,12 +434,17 @@ impl UIContainerState {
 
     pub const fn prev_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
-            Header::Id => Header::Status,     // All -> Status (wrap around)
-            Header::Name | Header::State | Header::Cpu | Header::Memory | Header::Rx | Header::Tx => {
+            Header::Id => Header::Status, // All -> Status (wrap around)
+            Header::Name
+            | Header::State
+            | Header::Cpu
+            | Header::Memory
+            | Header::Rx
+            | Header::Tx => {
                 Header::Id // Name -> All, Default to All
             }
-            Header::Image => Header::Name,    // Image -> Name
-            Header::Status => Header::Image,  // Status -> Image
+            Header::Image => Header::Name,   // Image -> Name
+            Header::Status => Header::Image, // Status -> Image
         };
     }
 }

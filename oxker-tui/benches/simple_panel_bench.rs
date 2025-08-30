@@ -1,8 +1,8 @@
 #![allow(clippy::unwrap_used)]
 
 use criterion::{Criterion, black_box, criterion_group, criterion_main};
-use std::fs::File;
 use std::fmt::Write as FmtWrite;
+use std::fs::File;
 use std::io::Write;
 use std::time::{Duration, Instant};
 

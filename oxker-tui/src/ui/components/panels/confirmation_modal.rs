@@ -1,10 +1,7 @@
 //! Generic confirmation modal component for command confirmations
 
 use crate::ui::{
-    GuiState,
-    color_conversion::IntoRatatuiColor,
-    components::Component,
-    gui_state::Region,
+    GuiState, color_conversion::IntoRatatuiColor, components::Component, gui_state::Region,
 };
 use oxker_core::{AppColors, CoreCommand, DockerCommand, Keymap};
 use parking_lot::Mutex;
@@ -158,8 +155,12 @@ impl<'p> Component<'p> for ConfirmationModal {
         let confirm_text_para = Paragraph::new(confirm_line).alignment(Alignment::Center);
 
         // Create button texts
-        let confirm_button_text = format!("( {} ) confirm", Self::format_key_text(oxker_core::KeyCode::Enter));
-        let cancel_text = format!("( {} | {} ) cancel", 
+        let confirm_button_text = format!(
+            "( {} ) confirm",
+            Self::format_key_text(oxker_core::KeyCode::Enter)
+        );
+        let cancel_text = format!(
+            "( {} | {} ) cancel",
             Self::format_key_text(oxker_core::KeyCode::Esc),
             Self::format_key_text(oxker_core::KeyCode::Char('q'))
         );
@@ -198,15 +199,15 @@ impl<'p> Component<'p> for ConfirmationModal {
         frame.render_widget(cancel_para, cancel_area);
         frame.render_widget(confirm_button_para, confirm_area);
 
-        props
-            .gui_state
-            .lock()
-            .update_region_map(Region::ConfirmationModal(ConfirmationButton::Cancel), cancel_area);
+        props.gui_state.lock().update_region_map(
+            Region::ConfirmationModal(ConfirmationButton::Cancel),
+            cancel_area,
+        );
 
-        props
-            .gui_state
-            .lock()
-            .update_region_map(Region::ConfirmationModal(ConfirmationButton::Confirm), confirm_area);
+        props.gui_state.lock().update_region_map(
+            Region::ConfirmationModal(ConfirmationButton::Confirm),
+            confirm_area,
+        );
     }
 
     fn handle_event(&mut self, _event: &Self::Event) -> Option<CoreCommand> {

@@ -22,10 +22,7 @@ fn test_exec_container_id_management() {
     gui_state.set_exec_container_id(Some(container_id.clone()));
 
     // Verify it's set
-    assert_eq!(
-        gui_state.get_exec_container_id(),
-        Some(container_id)
-    );
+    assert_eq!(gui_state.get_exec_container_id(), Some(container_id));
 
     // Clear it by removing Exec status
     gui_state.status_del(Status::Exec);

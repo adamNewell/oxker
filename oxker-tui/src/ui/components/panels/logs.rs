@@ -77,10 +77,10 @@ impl LogsPanel {
         } else {
             0
         };
-        
+
         // Use the pre-computed title from LogView which has container name and image
         let container_info = &props.view_model.log_view.title;
-        
+
         if container_info.is_empty() {
             format!(" Logs {current_position}/{total_logs} ")
         } else {
@@ -88,8 +88,9 @@ impl LogsPanel {
             // Current format is "Logs - container_name - image_name"
             let parts: Vec<&str> = container_info.splitn(3, " - ").collect();
             if parts.len() >= 3 {
-                format!(" Logs {}/{} - {} - {} ", 
-                    current_position, 
+                format!(
+                    " Logs {}/{} - {} - {} ",
+                    current_position,
                     total_logs,
                     parts[1], // container name
                     parts[2]  // image name

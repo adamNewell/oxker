@@ -5,8 +5,8 @@ use crate::ui::{
     components::{
         Component,
         panels::{
-            ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DeleteConfirmPanel, ErrorPanel,
-            FilterPanel, HeadersPanel, HelpPanel, LogsPanel, PortsPanel,
+            ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DeleteConfirmPanel,
+            ErrorPanel, FilterPanel, HeadersPanel, HelpPanel, LogsPanel, PortsPanel,
         },
         widgets::InfoBox,
     },
@@ -279,18 +279,20 @@ impl super::View for MainView<'_> {
 
         // Command confirmation dialog
         if model.status.contains(&Status::CommandConfirm)
-            && let Some((command, container_id)) = self.gui_state.lock().get_command_confirm() {
-                // Find container name from UIContainerState
-                let container_name = self
-                    .container_state
-                    .lock()
-                    .get_container_items()
-                    .iter()
-                    .find(|c| c.id == container_id)
-                    .map(|c| c.name.clone());
+            && let Some((command, container_id)) = self.gui_state.lock().get_command_confirm()
+        {
+            // Find container name from UIContainerState
+            let container_name = self
+                .container_state
+                .lock()
+                .get_container_items()
+                .iter()
+                .find(|c| c.id == container_id)
+                .map(|c| c.name.clone());
 
-                if let Some(name) = container_name {
-                    let confirm_props = crate::ui::components::panels::confirmation_modal::ConfirmationModalProps {
+            if let Some(name) = container_name {
+                let confirm_props =
+                    crate::ui::components::panels::confirmation_modal::ConfirmationModalProps {
                         command,
                         container_id: container_id.get(),
                         container_name: name.get(),
@@ -298,12 +300,13 @@ impl super::View for MainView<'_> {
                         keymap: self.keymap,
                         gui_state: self.gui_state,
                     };
-                    self.confirmation_modal.render(&confirm_props, frame.area(), frame);
-                } else {
-                    // Container was deleted externally, clear the dialog
-                    self.gui_state.lock().set_command_confirm(None);
-                }
+                self.confirmation_modal
+                    .render(&confirm_props, frame.area(), frame);
+            } else {
+                // Container was deleted externally, clear the dialog
+                self.gui_state.lock().set_command_confirm(None);
             }
+        }
 
         // Info box
         if let Some((text, instant)) = model.info_text.as_ref() {

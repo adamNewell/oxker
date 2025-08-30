@@ -237,9 +237,9 @@ pub mod tests {
     }
 
     /// Generates a test container item.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the index cannot be converted to u64.
     #[must_use]
     pub fn gen_item(id: &ContainerId, index: usize) -> ContainerItem {
@@ -282,9 +282,9 @@ pub mod tests {
     }
 
     /// Generates a test container summary.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// Panics if the state string cannot be parsed as a valid container state enum,
     /// or if the index cannot be converted to i64.
     #[must_use]

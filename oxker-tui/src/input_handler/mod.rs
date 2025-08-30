@@ -285,15 +285,18 @@ impl InputHandler {
 
         // Special handling for Delete command - use existing DeleteConfirm flow
         if command == oxker_core::DockerCommand::Delete {
-            self.gui_state.lock().set_delete_container(Some(container_id));
+            self.gui_state
+                .lock()
+                .set_delete_container(Some(container_id));
         } else {
             // Show the new confirmation modal for other commands
-            self.gui_state.lock().set_command_confirm(Some((command, container_id)));
+            self.gui_state
+                .lock()
+                .set_command_confirm(Some((command, container_id)));
         }
 
         Ok(())
     }
-
 
     /// If keymap.scroll_modifier is pressed, return 10, else return 1, to speed up scrolling
     fn get_modifier_total(&self, modifier: KeyModifiers) -> u8 {
@@ -452,7 +455,7 @@ impl InputHandler {
         if key_code == KeyCode::Enter {
             // Confirm the command
             self.confirm_command().await;
-        } else if key_code == KeyCode::Esc 
+        } else if key_code == KeyCode::Esc
             || key_code == KeyCode::Char('q')
             || self.keymap.clear.0 == key_code
             || self.keymap.clear.1 == Some(key_code)
@@ -540,9 +543,9 @@ impl InputHandler {
                             self.get_filter_field(),
                         ))
                         .await
-                    {
-                        tracing::error!("Failed to apply filter: {}", e);
-                    }
+                {
+                    tracing::error!("Failed to apply filter: {}", e);
+                }
             }
             KeyCode::Left => {
                 // Update filter field and re-apply the filter if there's a term
@@ -556,9 +559,9 @@ impl InputHandler {
                             self.get_filter_field(),
                         ))
                         .await
-                    {
-                        tracing::error!("Failed to apply filter: {}", e);
-                    }
+                {
+                    tracing::error!("Failed to apply filter: {}", e);
+                }
             }
             _ => (),
         }
@@ -690,8 +693,7 @@ impl InputHandler {
             }
 
             // Check for 's' as search key first (before save_logs)
-            _ if key_code == KeyCode::Char('s') && modifier == KeyModifiers::NONE =>
-            {
+            _ if key_code == KeyCode::Char('s') && modifier == KeyModifiers::NONE => {
                 // 's' without modifiers triggers search/filter mode
                 let status = self.gui_state.lock().get_status();
                 if !status.contains(&Status::Filter) {

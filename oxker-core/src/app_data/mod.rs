@@ -1033,7 +1033,7 @@ impl AppData {
         for container in all_containers {
             self.update_or_insert_container(container);
         }
-        
+
         // Apply sorting if configured
         if self.sorted_by.is_some() {
             self.sort_containers();
@@ -1438,11 +1438,11 @@ mod tests {
     /// Test that AppData defaults to sorting by Name ascending
     fn test_default_sort_by_name() {
         use crate::tests::gen_config;
-        
+
         let (event_bus, _receiver) = EventBus::new(100);
         let event_bus = Arc::new(event_bus);
         let app_data = AppData::new(gen_config(), event_bus);
-        
+
         // Check that default sort is by Name ascending
         assert_eq!(app_data.sorted_by, Some((Header::Name, SortedOrder::Asc)));
     }

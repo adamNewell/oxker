@@ -38,7 +38,6 @@ impl HeadersPanel {
         Self {}
     }
 
-
     /// Generate help text based on current state and keymap
     fn gen_help_text(props: &HeadersPanelProps) -> String {
         let suffix = if props.view_model.status.contains(&Status::Help) {
@@ -113,15 +112,15 @@ impl HeadersPanel {
         // Static header template based on CORRECTED - Default from errors.txt
         // Each column has exactly the spacing shown, with sort indicators replacing the last space when active
         let mut header_spans = Vec::new();
-        
+
         // Add padding for border (1 char) + list highlight symbol (2 chars) = 3 chars total
         header_spans.push(Span::raw("   "));
-        
+
         // Helper to get color and sort indicator for a header
         let get_header_style = |header: Header| -> (CoreColor, &'static str) {
             let mut color = props.theme.headers_bar.text;
-            let mut indicator = " ";  // Default trailing space
-            
+            let mut indicator = " "; // Default trailing space
+
             if let Some((sorted_header, order)) = &props.view_model.sorted_by
                 && &header == sorted_header
             {
@@ -131,68 +130,68 @@ impl HeadersPanel {
                     SortedOrder::Desc => "▼",
                 };
             }
-            
+
             (color, indicator)
         };
-        
+
         let (color, indicator) = get_header_style(Header::Name);
         header_spans.push(Span::styled(
             format!("name {indicator}                  "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::State);
         header_spans.push(Span::styled(
             format!("state {indicator}       "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Status);
         header_spans.push(Span::styled(
             format!("status {indicator}                 "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Cpu);
         header_spans.push(Span::styled(
             format!("cpu {indicator}    "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Memory);
         header_spans.push(Span::styled(
             format!("memory/limit {indicator}        "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Id);
         header_spans.push(Span::styled(
             format!("id {indicator}      "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Image);
         header_spans.push(Span::styled(
             format!("image {indicator}                              "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Rx);
         header_spans.push(Span::styled(
             format!("↓ rx {indicator}      "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
-        
+
         let (color, indicator) = get_header_style(Header::Tx);
         header_spans.push(Span::styled(
             format!("↑ tx {indicator}                    "),
-            Style::default().fg(color.into_ratatui_color())
+            Style::default().fg(color.into_ratatui_color()),
         ));
 
         let header_line = Line::from(header_spans);
         let paragraph = Paragraph::new(header_line)
             .style(Style::default().bg(props.theme.headers_bar.background.into_ratatui_color()));
-        
+
         let headers_rect = Rect {
             x: split_bar[0].x,
             y: split_bar[1].y,
@@ -200,61 +199,106 @@ impl HeadersPanel {
             height: 1,
         };
         frame.render_widget(paragraph, headers_rect);
-        
+
         // Register clickable regions for each header using fixed positions
         let mut x_offset = split_bar[0].x + 3; // Start after padding (3 chars)
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Name),
-            Rect { x: x_offset, y: split_bar[1].y, width: 24, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 24,
+                height: 1,
+            },
         );
         x_offset += 24;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::State),
-            Rect { x: x_offset, y: split_bar[1].y, width: 14, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 14,
+                height: 1,
+            },
         );
         x_offset += 14;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Status),
-            Rect { x: x_offset, y: split_bar[1].y, width: 25, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 25,
+                height: 1,
+            },
         );
         x_offset += 25;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Cpu),
-            Rect { x: x_offset, y: split_bar[1].y, width: 9, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 9,
+                height: 1,
+            },
         );
         x_offset += 9;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Memory),
-            Rect { x: x_offset, y: split_bar[1].y, width: 22, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 22,
+                height: 1,
+            },
         );
         x_offset += 22;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Id),
-            Rect { x: x_offset, y: split_bar[1].y, width: 10, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 10,
+                height: 1,
+            },
         );
         x_offset += 10;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Image),
-            Rect { x: x_offset, y: split_bar[1].y, width: 37, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 37,
+                height: 1,
+            },
         );
         x_offset += 37;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Rx),
-            Rect { x: x_offset, y: split_bar[1].y, width: 12, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 12,
+                height: 1,
+            },
         );
         x_offset += 12;
-        
+
         props.gui_state.lock().update_region_map(
             Region::Header(Header::Tx),
-            Rect { x: x_offset, y: split_bar[1].y, width: 26, height: 1 }
+            Rect {
+                x: x_offset,
+                y: split_bar[1].y,
+                width: 26,
+                height: 1,
+            },
         );
     }
 }

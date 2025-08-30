@@ -39,13 +39,13 @@ fn test_docker_cli_status_variants() {
 #[test]
 fn test_docker_cli_cache_invalidation() {
     let mut detector = DockerCliDetector::new();
-    
+
     // First detection will populate cache
     let _status = detector.detect();
-    
+
     // Invalidate cache
     detector.invalidate_cache();
-    
+
     // Next detection should perform fresh check (can't easily verify without mocking)
     let _status2 = detector.detect();
 }
@@ -61,7 +61,7 @@ fn test_docker_cli_status_debug_format() {
 fn test_actual_docker_detection() {
     let mut detector = DockerCliDetector::new();
     let status = detector.detect();
-    
+
     // Just verify we get some status without panicking
     match status {
         DockerCliStatus::Available => {
@@ -86,19 +86,19 @@ fn test_actual_docker_detection() {
 #[allow(clippy::match_same_arms)]
 fn test_docker_cli_detector_caching() {
     use std::time::Instant;
-    
+
     let mut detector = DockerCliDetector::new();
-    
+
     // First call should detect
     let start = Instant::now();
     let status1 = detector.detect();
     let first_duration = start.elapsed();
-    
+
     // Second call should use cache (should be much faster)
     let start = Instant::now();
     let status2 = detector.detect();
     let second_duration = start.elapsed();
-    
+
     // Status should be the same
     match (status1, status2) {
         (DockerCliStatus::Available, DockerCliStatus::Available) => (),
@@ -108,7 +108,7 @@ fn test_docker_cli_detector_caching() {
         (DockerCliStatus::PermissionDenied(_), DockerCliStatus::PermissionDenied(_)) => (),
         _ => panic!("Cache returned different status"),
     }
-    
+
     // Second call should generally be faster due to caching
     // (though this isn't guaranteed in all test environments)
     println!("First detection: {first_duration:?}, Second detection: {second_duration:?}");

@@ -30,7 +30,7 @@ impl DockerCliDetector {
                 DockerCliStatus::Available => Self::DEFAULT_TTL,
                 _ => Self::ERROR_TTL,
             };
-            
+
             if timestamp.elapsed() < ttl {
                 return status.clone();
             }
@@ -65,11 +65,13 @@ impl DockerCliDetector {
                 } else {
                     // Docker exists but might have issues
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    if stderr.contains("Cannot connect to the Docker daemon") ||
-                       stderr.contains("Is the docker daemon running") {
+                    if stderr.contains("Cannot connect to the Docker daemon")
+                        || stderr.contains("Is the docker daemon running")
+                    {
                         DockerCliStatus::DaemonNotRunning
-                    } else if stderr.contains("permission denied") ||
-                              stderr.contains("Permission denied") {
+                    } else if stderr.contains("permission denied")
+                        || stderr.contains("Permission denied")
+                    {
                         DockerCliStatus::PermissionDenied(stderr.to_string())
                     } else {
                         DockerCliStatus::DaemonNotRunning
@@ -86,7 +88,7 @@ impl DockerCliDetector {
                             "/opt/homebrew/bin/docker",
                             "/snap/bin/docker",
                         ];
-                        
+
                         let mut checked_paths = Vec::new();
                         for path in &common_paths {
                             checked_paths.push((*path).to_string());
@@ -94,13 +96,13 @@ impl DockerCliDetector {
                                 return DockerCliStatus::NotInPath(checked_paths);
                             }
                         }
-                        
+
                         DockerCliStatus::NotFound
                     }
-                    io::ErrorKind::PermissionDenied => {
-                        DockerCliStatus::PermissionDenied("Permission denied executing docker".to_string())
-                    }
-                    _ => DockerCliStatus::NotFound
+                    io::ErrorKind::PermissionDenied => DockerCliStatus::PermissionDenied(
+                        "Permission denied executing docker".to_string(),
+                    ),
+                    _ => DockerCliStatus::NotFound,
                 }
             }
         }
@@ -115,9 +117,10 @@ impl DockerCliDetector {
                 } else {
                     // Docker exists but might have issues
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    if stderr.contains("Cannot connect to the Docker daemon") ||
-                       stderr.contains("Is the docker daemon running") ||
-                       stderr.contains("error during connect") {
+                    if stderr.contains("Cannot connect to the Docker daemon")
+                        || stderr.contains("Is the docker daemon running")
+                        || stderr.contains("error during connect")
+                    {
                         DockerCliStatus::DaemonNotRunning
                     } else if stderr.contains("Access is denied") {
                         DockerCliStatus::PermissionDenied(stderr.to_string())
@@ -134,14 +137,14 @@ impl DockerCliDetector {
                                 return DockerCliStatus::Available;
                             }
                         }
-                        
+
                         // Check common Windows paths
                         let common_paths = vec![
                             r"C:\Program Files\Docker\Docker\resources\bin\docker.exe",
                             r"C:\ProgramData\DockerDesktop\version-bin\docker.exe",
                             r"C:\Program Files\Docker\Docker\resources\docker.exe",
                         ];
-                        
+
                         let mut checked_paths = Vec::new();
                         for path in &common_paths {
                             checked_paths.push((*path).to_string());
@@ -149,10 +152,10 @@ impl DockerCliDetector {
                                 return DockerCliStatus::NotInPath(checked_paths);
                             }
                         }
-                        
+
                         DockerCliStatus::NotFound
                     }
-                    _ => DockerCliStatus::NotFound
+                    _ => DockerCliStatus::NotFound,
                 }
             }
         }

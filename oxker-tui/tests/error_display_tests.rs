@@ -1,10 +1,7 @@
 use oxker_core::{AppColors, AppError, Keymap};
-use oxker_tui::ui::components::panels::error::{ErrorPanel, ErrorPanelProps};
 use oxker_tui::ui::components::Component;
-use ratatui::{
-    backend::TestBackend,
-    Terminal,
-};
+use oxker_tui::ui::components::panels::error::{ErrorPanel, ErrorPanelProps};
+use ratatui::{Terminal, backend::TestBackend};
 
 #[test]
 fn test_error_panel_docker_not_found() {
@@ -12,7 +9,7 @@ fn test_error_panel_docker_not_found() {
     let theme = AppColors::new();
     let keymap = Keymap::new();
     let error = AppError::DockerNotFound;
-    
+
     let props = ErrorPanelProps {
         error: &error,
         theme: &theme,
@@ -42,7 +39,7 @@ fn test_error_panel_container_not_running() {
     let theme = AppColors::new();
     let keymap = Keymap::new();
     let error = AppError::ContainerNotRunning("test_container".to_string());
-    
+
     let props = ErrorPanelProps {
         error: &error,
         theme: &theme,
@@ -71,7 +68,7 @@ fn test_error_panel_docker_daemon_not_running() {
     let theme = AppColors::new();
     let keymap = Keymap::new();
     let error = AppError::DockerDaemonNotRunning;
-    
+
     let props = ErrorPanelProps {
         error: &error,
         theme: &theme,
@@ -99,8 +96,10 @@ fn test_error_panel_docker_not_accessible() {
     let error_panel = ErrorPanel::new();
     let theme = AppColors::new();
     let keymap = Keymap::new();
-    let error = AppError::DockerNotAccessible("Docker found at /usr/local/bin/docker but not in PATH".to_string());
-    
+    let error = AppError::DockerNotAccessible(
+        "Docker found at /usr/local/bin/docker but not in PATH".to_string(),
+    );
+
     let props = ErrorPanelProps {
         error: &error,
         theme: &theme,
@@ -129,7 +128,7 @@ fn test_error_panel_container_not_found() {
     let theme = AppColors::new();
     let keymap = Keymap::new();
     let error = AppError::ContainerNotFound("abc123".to_string());
-    
+
     let props = ErrorPanelProps {
         error: &error,
         theme: &theme,
@@ -157,14 +156,14 @@ fn test_error_panel_multiline_handling() {
     let error_panel = ErrorPanel::new();
     let theme = AppColors::new();
     let keymap = Keymap::new();
-    
+
     // Test each multi-line error to ensure proper formatting
     let errors = vec![
         AppError::DockerNotFound,
         AppError::DockerNotAccessible("Multiple\nlines\nof\ndetail".to_string()),
         AppError::DockerDaemonNotRunning,
     ];
-    
+
     for error in errors {
         let props = ErrorPanelProps {
             error: &error,
@@ -188,4 +187,3 @@ fn test_error_panel_multiline_handling() {
         assert_eq!(buffer.area.height, 40);
     }
 }
-
