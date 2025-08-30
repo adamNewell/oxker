@@ -104,13 +104,7 @@ impl HeadersPanel {
     }
 
     /// Draw the sortable column headers
-    fn draw_columns(frame: &mut Frame, props: &HeadersPanelProps, split_bar: &[Rect]) {
-        if !props.view_model.has_containers {
-            return;
-        }
-
-        // Static header template based on CORRECTED - Default from errors.txt
-        // Each column has exactly the spacing shown, with sort indicators replacing the last space when active
+    fn build_header_spans(props: &HeadersPanelProps) -> Vec<Span<'static>> {
         let mut header_spans = Vec::new();
 
         // Add padding for border (1 char) + list highlight symbol (2 chars) = 3 chars total
@@ -188,6 +182,49 @@ impl HeadersPanel {
             Style::default().fg(color.into_ratatui_color()),
         ));
 
+        header_spans
+    }
+
+    // Define header widths for clickable regions
+    const HEADER_WIDTHS: [(Header, u16); 9] = [
+        (Header::Name, 24),
+        (Header::State, 14),
+        (Header::Status, 25),
+        (Header::Cpu, 9),
+        (Header::Memory, 22),
+        (Header::Id, 10),
+        (Header::Image, 32),
+        (Header::Rx, 11),
+        (Header::Tx, 11),
+    ];
+
+    fn register_header_regions(props: &HeadersPanelProps, split_bar: &[Rect]) {
+        // Register clickable regions for each header using fixed positions
+        let mut x_offset = split_bar[0].x + 3; // Start after padding (3 chars)
+
+        for (header, width) in Self::HEADER_WIDTHS {
+            props.gui_state.lock().update_region_map(
+                Region::Header(header),
+                Rect {
+                    x: x_offset,
+                    y: split_bar[1].y,
+                    width,
+                    height: 1,
+                },
+            );
+            x_offset += width;
+        }
+    }
+
+    fn draw_columns(frame: &mut Frame, props: &HeadersPanelProps, split_bar: &[Rect]) {
+        if !props.view_model.has_containers {
+            return;
+        }
+
+        // Static header template based on CORRECTED - Default from errors.txt
+        // Each column has exactly the spacing shown, with sort indicators replacing the last space when active
+        let header_spans = Self::build_header_spans(props);
+
         let header_line = Line::from(header_spans);
         let paragraph = Paragraph::new(header_line)
             .style(Style::default().bg(props.theme.headers_bar.background.into_ratatui_color()));
@@ -200,106 +237,8 @@ impl HeadersPanel {
         };
         frame.render_widget(paragraph, headers_rect);
 
-        // Register clickable regions for each header using fixed positions
-        let mut x_offset = split_bar[0].x + 3; // Start after padding (3 chars)
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Name),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 24,
-                height: 1,
-            },
-        );
-        x_offset += 24;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::State),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 14,
-                height: 1,
-            },
-        );
-        x_offset += 14;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Status),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 25,
-                height: 1,
-            },
-        );
-        x_offset += 25;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Cpu),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 9,
-                height: 1,
-            },
-        );
-        x_offset += 9;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Memory),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 22,
-                height: 1,
-            },
-        );
-        x_offset += 22;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Id),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 10,
-                height: 1,
-            },
-        );
-        x_offset += 10;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Image),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 37,
-                height: 1,
-            },
-        );
-        x_offset += 37;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Rx),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 12,
-                height: 1,
-            },
-        );
-        x_offset += 12;
-
-        props.gui_state.lock().update_region_map(
-            Region::Header(Header::Tx),
-            Rect {
-                x: x_offset,
-                y: split_bar[1].y,
-                width: 26,
-                height: 1,
-            },
-        );
+        // Register clickable regions for each header
+        Self::register_header_regions(props, split_bar);
     }
 }
 

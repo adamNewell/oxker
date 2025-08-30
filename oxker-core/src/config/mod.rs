@@ -7,6 +7,7 @@ use parse_config_file::ConfigFile;
 mod color;
 mod color_parser;
 mod keymap_parser;
+mod migration;
 
 use crate::{ENV_KEY, ENV_VALUE};
 pub use {color::Color, color_parser::AppColors, keymap_parser::Keymap};

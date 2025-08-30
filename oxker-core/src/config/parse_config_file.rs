@@ -121,6 +121,20 @@ impl ConfigFile {
 
     /// Read the config file path to string, then attempt to parse
     fn parse_config_file(file_format: ConfigFileFormat, path: &PathBuf) -> Result<Self, AppError> {
+        // Attempt migration if the file exists
+        if std::fs::exists(path).unwrap_or(false)
+            && let Ok(Some(migration)) =
+                super::migration::ConfigMigration::migrate_config_file(path)
+        {
+            tracing::info!(
+                "Config file migrated. Backup saved at: {:?}",
+                migration.backup_path
+            );
+            for change in migration.changes_made {
+                tracing::info!("Migration: {}", change);
+            }
+        }
+
         let mut file = std::fs::File::open(path).map_err(|_| {
             AppError::IO(
                 path.to_str()
