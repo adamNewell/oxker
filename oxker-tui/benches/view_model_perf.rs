@@ -16,6 +16,7 @@ fn main() {
         color_logs: false,
         docker_interval_ms: 1000,
         keymap: Keymap::new(),
+        network_interface: None,
         show_logs: true,
         show_timestamp: false,
         timestamp_format: String::new(),

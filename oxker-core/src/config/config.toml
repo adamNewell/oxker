@@ -34,6 +34,12 @@ timezone = "Etc/UTC"
 # *Should* accept any valid strftime string up to 32 chars, see https://strftime.org/
 timestamp_format = "%Y-%m-%dT%H:%M:%S.%8f"
 
+# Network interface to use for collecting network statistics
+# Options: "auto" (default - auto-detect), "eth0" (specific interface), "none" (disable network stats)
+# When set to "auto", oxker will attempt to find the primary network interface from container stats
+# Priority order: eth0 > eth* > wlan* > first available interface
+# network_interface = "auto"
+
 # Directory for saving exported logs, defaults to `$HOME`, this is automatically *correctly* calculated for Linux, Mac, and Windows
 # save_dir = "$HOME"
 

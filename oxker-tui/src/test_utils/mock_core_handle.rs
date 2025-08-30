@@ -58,6 +58,7 @@ impl MockCoreHandle {
             show_self: false,
             app_colors: AppColors::new(),
             keymap: Keymap::new(),
+            network_interface: None,
             timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             show_timestamp: false,
             show_logs: true,

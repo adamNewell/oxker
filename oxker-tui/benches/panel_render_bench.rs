@@ -446,6 +446,7 @@ fn benchmark_full_ui_render(c: &mut Criterion) {
                     host: None,
                     in_container: false,
                     keymap: keymap.clone(),
+                    network_interface: None,
                     raw_logs: false,
                     save_dir: None,
                     show_self: false,

@@ -67,6 +67,7 @@ pub struct ConfigFile {
     pub gui: Option<bool>,
     pub host: Option<String>,
     pub keymap: Option<ConfigKeymap>,
+    pub network_interface: Option<String>,
     pub raw_logs: Option<bool>,
     pub save_dir: Option<String>,
     pub show_self: Option<bool>,
@@ -268,5 +269,34 @@ mod tests {
 
         assert_eq!(AppColors::from(Some(result_toml.clone())), AppColors::new());
         assert_eq!(result_toml, result_jsonc);
+    }
+
+    #[test]
+    /// Test parsing network_interface config option
+    fn test_parse_network_interface_config() {
+        let toml_with_network = r#"
+            network_interface = "eth0"
+        "#;
+        let result = ConfigFile::parse(super::ConfigFileFormat::Toml, toml_with_network).unwrap();
+        assert_eq!(result.network_interface, Some("eth0".to_string()));
+
+        let toml_with_auto = r#"
+            network_interface = "auto"
+        "#;
+        let result = ConfigFile::parse(super::ConfigFileFormat::Toml, toml_with_auto).unwrap();
+        assert_eq!(result.network_interface, Some("auto".to_string()));
+
+        let toml_with_none = r#"
+            network_interface = "none"
+        "#;
+        let result = ConfigFile::parse(super::ConfigFileFormat::Toml, toml_with_none).unwrap();
+        assert_eq!(result.network_interface, Some("none".to_string()));
+
+        let toml_without_network = r"
+            docker_interval = 1000
+        ";
+        let result =
+            ConfigFile::parse(super::ConfigFileFormat::Toml, toml_without_network).unwrap();
+        assert_eq!(result.network_interface, None);
     }
 }

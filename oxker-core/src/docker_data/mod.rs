@@ -30,6 +30,7 @@ use crate::{
     },
 };
 mod message;
+mod network;
 pub use message::DockerMessage;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
@@ -72,6 +73,7 @@ pub struct DockerData {
     config: Config,
     docker: Arc<Docker>,
     event_bus: Arc<EventBus>,
+    network_detector: Arc<Mutex<network::NetworkInterfaceDetector>>,
     receiver: Receiver<DockerMessage>,
     spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
 }
@@ -127,9 +129,7 @@ impl DockerData {
     /// Get a single docker stat in order to update mem and cpu usage
     /// don't take &self, so that can tokio::spawn into it's own thread
     /// remove if from spawns hashmap when complete
-    /// Get a single docker stat in order to update mem and cpu usage
-    /// don't take &self, so that can tokio::spawn into it's own thread
-    /// remove if from spawns hashmap when complete
+    #[allow(clippy::too_many_arguments)]
     async fn update_container_stat(
         app_data: Arc<Mutex<AppData>>,
         docker: Arc<Docker>,
@@ -137,6 +137,8 @@ impl DockerData {
         spawn_id: SpawnId,
         spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
         event_bus: Arc<EventBus>,
+        network_detector: Arc<Mutex<network::NetworkInterfaceDetector>>,
+        network_interface_config: Option<String>,
     ) {
         let id = spawn_id.get_id();
         let mut stream = docker
@@ -178,14 +180,22 @@ impl DockerData {
                 (None, None)
             };
 
-            // TODO is hardcoded eth0 a good idea here?
-            let (rx, tx) = stats.networks.as_ref().map_or((0, 0), |i| {
-                i.get("eth0").map_or((0, 0), |x| {
-                    (
-                        x.rx_bytes.unwrap_or_default(),
-                        x.tx_bytes.unwrap_or_default(),
-                    )
-                })
+            // Use configured or auto-detected network interface
+            let (rx, tx) = stats.networks.as_ref().map_or((0, 0), |networks| {
+                let interface = network_detector.lock().detect_interface(
+                    id.get(),
+                    networks,
+                    network_interface_config.as_deref().or(Some("auto")),
+                );
+
+                interface
+                    .and_then(|iface| networks.get(&iface))
+                    .map_or((0, 0), |x| {
+                        (
+                            x.rx_bytes.unwrap_or_default(),
+                            x.tx_bytes.unwrap_or_default(),
+                        )
+                    })
             });
 
             app_data
@@ -228,6 +238,8 @@ impl DockerData {
                     spawn_id,
                     Arc::clone(&self.spawns),
                     Arc::clone(&self.event_bus),
+                    Arc::clone(&self.network_detector),
+                    self.config.network_interface.clone(),
                 )));
             }
         }
@@ -527,6 +539,7 @@ impl DockerData {
                 binate: Binate::One,
                 docker: Arc::new(docker),
                 event_bus,
+                network_detector: Arc::new(Mutex::new(network::NetworkInterfaceDetector::new())),
                 receiver: docker_rx,
                 spawns: Arc::new(Mutex::new(HashMap::new())),
             };

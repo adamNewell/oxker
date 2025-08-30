@@ -9,6 +9,7 @@ const fn gen_config() -> Config {
         host: None,
         in_container: false,
         keymap: Keymap::new(),
+        network_interface: None,
         raw_logs: false,
         save_dir: None,
         show_self: false,

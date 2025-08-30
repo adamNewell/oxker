@@ -48,6 +48,7 @@ impl CoreHandle {
     ///     show_self: false,
     ///     app_colors: AppColors::new(),
     ///     keymap: Keymap::new(),
+    ///     network_interface: None,
     ///     timestamp_format: "HH:MM:SS".to_string(),
     ///     show_timestamp: false,
     ///     show_logs: true,

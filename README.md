@@ -159,6 +159,24 @@ If running an `oxker` container, the default config location will be `/` rather 
 docker run --rm -it -v /var/run/docker.sock:/var/run/docker.sock:ro -v /some_location/config.toml:/config.toml:ro ghcr.io/mrjackwills/oxker
 ```
 
+#### Network Interface Configuration
+
+By default, `oxker` uses auto-detection to find the primary network interface for each container. If your system doesn't have `eth0` or you want to specify a different interface, you can configure it in the config file:
+
+```toml
+# Network interface to use for collecting network statistics
+# Options: "auto" (default), "eth0", "wlan0", or any specific interface name, "none" to disable
+network_interface = "auto"
+```
+
+When set to `"auto"`, `oxker` will attempt to find the primary network interface with the following priority:
+1. eth0 (if available)
+2. Other eth* interfaces (eth1, eth2, etc.)
+3. wlan* interfaces
+4. First available interface
+
+This ensures network statistics work on systems without the traditional `eth0` interface.
+
 ## Build step
 
 This project uses a Rust workspace structure with two crates:
