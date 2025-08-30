@@ -356,8 +356,12 @@ impl DockerData {
 
     /// Initialize docker container data, before any messages are received
     async fn initialise_container_data(&mut self) {
-        // TODO: Emit CoreEvent::LoadingStarted(loading_uuid.to_string())
-        let _loading_uuid = Uuid::new_v4();
+        let loading_uuid = Uuid::new_v4();
+        drop(
+            self.event_bus
+                .publish(CoreEvent::LoadingStarted(loading_uuid.to_string())),
+        );
+
         self.update_all_containers().await;
         let all_ids = self.app_data.lock().get_all_id_state();
         let all_ids_len = all_ids.len();
@@ -368,7 +372,11 @@ impl DockerData {
             // Don't sort containers automatically - only sort when user requests it
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-        // TODO: Emit CoreEvent::LoadingFinished(loading_uuid.to_string())
+
+        drop(
+            self.event_bus
+                .publish(CoreEvent::LoadingFinished(loading_uuid.to_string())),
+        );
     }
 
     /// Update all cpu_mem, and selected container log (if a log update join_handle isn't currently being executed)
@@ -398,10 +406,10 @@ impl DockerData {
     }
 
     /// Set the global error as the docker error
-    fn set_error(app_data: &Arc<Mutex<AppData>>, error: DockerCommand, _event_bus: &Arc<EventBus>) {
+    fn set_error(app_data: &Arc<Mutex<AppData>>, error: DockerCommand, event_bus: &Arc<EventBus>) {
         let error = AppError::DockerCommand(error);
+        drop(event_bus.publish(CoreEvent::Error(error.to_string())));
         app_data.lock().set_error(error);
-        // TODO: Emit CoreEvent::Error(error.to_string())
     }
 
     /// Execute docker commands (start, stop etc) on it's own tokio thread
@@ -412,11 +420,15 @@ impl DockerData {
             Arc::clone(&self.event_bus),
         );
         tokio::spawn(async move {
-            let _uuid = Uuid::new_v4();
-            // TODO: Emit CoreEvent::LoadingStarted(uuid.to_string())
+            let uuid = Uuid::new_v4();
+            drop(event_bus.publish(CoreEvent::LoadingStarted(uuid.to_string())));
+
             if match control {
                 DockerCommand::Delete => {
-                    // TODO: Emit CoreEvent::ContainerDeletionStarted(id.to_string())
+                    drop(
+                        event_bus
+                            .publish(CoreEvent::ContainerDeletionStarted(id.get().to_string())),
+                    );
                     docker
                         .remove_container(
                             id.get(),
@@ -450,7 +462,8 @@ impl DockerData {
             {
                 Self::set_error(&app_data, control, &event_bus);
             }
-            // TODO: Emit CoreEvent::LoadingFinished(uuid.to_string())
+
+            drop(event_bus.publish(CoreEvent::LoadingFinished(uuid.to_string())));
         });
 
         self.update_everything().await;
@@ -461,8 +474,11 @@ impl DockerData {
     async fn message_handler(&mut self) {
         while let Some(message) = self.receiver.recv().await {
             match message {
-                DockerMessage::ConfirmDelete(_id) => {
-                    // TODO: Emit CoreEvent::ContainerDeletionStarted(id.to_string())
+                DockerMessage::ConfirmDelete(id) => {
+                    drop(
+                        self.event_bus
+                            .publish(CoreEvent::ContainerDeletionStarted(id.get().to_string())),
+                    );
                 }
                 DockerMessage::Control((command, id)) => self.execute_command(command, id).await,
                 DockerMessage::Exec(docker_tx) => {

@@ -8,10 +8,9 @@ fn test_docker_cli_detector_creation() {
 }
 
 #[test]
-#[allow(clippy::match_same_arms)]
 fn test_docker_cli_status_variants() {
     // Test that all status variants can be created and cloned
-    let statuses = vec![
+    let statuses = [
         DockerCliStatus::Available,
         DockerCliStatus::NotFound,
         DockerCliStatus::NotInPath(vec!["path1".to_string(), "path2".to_string()]),
@@ -19,21 +18,24 @@ fn test_docker_cli_status_variants() {
         DockerCliStatus::DaemonNotRunning,
     ];
 
-    for status in statuses {
+    for status in &statuses {
         let cloned = status.clone();
-        match (status, cloned) {
-            (DockerCliStatus::Available, DockerCliStatus::Available) => (),
-            (DockerCliStatus::NotFound, DockerCliStatus::NotFound) => (),
+        match (status.clone(), cloned) {
             (DockerCliStatus::NotInPath(a), DockerCliStatus::NotInPath(b)) => {
                 assert_eq!(a, b);
             }
             (DockerCliStatus::PermissionDenied(a), DockerCliStatus::PermissionDenied(b)) => {
                 assert_eq!(a, b);
             }
-            (DockerCliStatus::DaemonNotRunning, DockerCliStatus::DaemonNotRunning) => (),
+            (DockerCliStatus::Available, DockerCliStatus::Available)
+            | (DockerCliStatus::NotFound, DockerCliStatus::NotFound)
+            | (DockerCliStatus::DaemonNotRunning, DockerCliStatus::DaemonNotRunning) => (),
             _ => panic!("Clone mismatch"),
         }
     }
+
+    // Explicitly drop to ensure cleanup
+    drop(statuses);
 }
 
 #[test]
@@ -83,7 +85,6 @@ fn test_actual_docker_detection() {
 }
 
 #[test]
-#[allow(clippy::match_same_arms)]
 fn test_docker_cli_detector_caching() {
     use std::time::Instant;
 
@@ -101,11 +102,11 @@ fn test_docker_cli_detector_caching() {
 
     // Status should be the same
     match (status1, status2) {
-        (DockerCliStatus::Available, DockerCliStatus::Available) => (),
-        (DockerCliStatus::NotFound, DockerCliStatus::NotFound) => (),
-        (DockerCliStatus::DaemonNotRunning, DockerCliStatus::DaemonNotRunning) => (),
-        (DockerCliStatus::NotInPath(_), DockerCliStatus::NotInPath(_)) => (),
-        (DockerCliStatus::PermissionDenied(_), DockerCliStatus::PermissionDenied(_)) => (),
+        (DockerCliStatus::Available, DockerCliStatus::Available)
+        | (DockerCliStatus::NotFound, DockerCliStatus::NotFound)
+        | (DockerCliStatus::DaemonNotRunning, DockerCliStatus::DaemonNotRunning)
+        | (DockerCliStatus::NotInPath(_), DockerCliStatus::NotInPath(_))
+        | (DockerCliStatus::PermissionDenied(_), DockerCliStatus::PermissionDenied(_)) => (),
         _ => panic!("Cache returned different status"),
     }
 

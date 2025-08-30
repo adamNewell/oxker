@@ -69,12 +69,14 @@ impl UIEventHandler {
                 CoreEvent::LoadingStarted(uuid_str) => {
                     debug!("Loading started: {}", uuid_str);
                     if let Ok(uuid) = Uuid::parse_str(&uuid_str) {
+                        self.gui_state.lock().add_loading_uuid(uuid);
                         GuiState::start_loading_animation(&self.gui_state, uuid);
                     }
                 }
                 CoreEvent::LoadingFinished(uuid_str) => {
                     debug!("Loading finished: {}", uuid_str);
                     if let Ok(uuid) = Uuid::parse_str(&uuid_str) {
+                        self.gui_state.lock().remove_loading_uuid(uuid);
                         self.gui_state.lock().stop_loading_animation(uuid);
                     }
                 }

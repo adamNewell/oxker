@@ -8,7 +8,7 @@ use crate::ui::{
             ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DeleteConfirmPanel,
             ErrorPanel, FilterPanel, HeadersPanel, HelpPanel, LogsPanel, PortsPanel,
         },
-        widgets::InfoBox,
+        widgets::{InfoBox, LoadingIndicator},
     },
 };
 use oxker_core::{Config, Keymap};
@@ -146,15 +146,13 @@ impl<'a> MainView<'a> {
 }
 
 impl super::View for MainView<'_> {
+    #[allow(clippy::too_many_lines)]
     fn render(&self, model: &FrameViewModel, frame: &mut Frame) {
         let theme = &self.config.app_colors;
 
-        // Main UI rendering
         {
-            // Calculate main layout
             let whole_layout = Self::calculate_main_layout(model, frame.area());
 
-            // Render headers
             let headers_props = crate::ui::components::panels::headers::HeadersPanelProps {
                 view_model: model,
                 theme,
@@ -163,7 +161,6 @@ impl super::View for MainView<'_> {
             };
             self.headers.render(&headers_props, whole_layout[0], frame);
 
-            // Render filter if active
             if let Some(filter_rect) = whole_layout.get(2) {
                 let filter_props = crate::ui::components::panels::filter::FilterPanelProps {
                     filter_by: model.filter_by,
@@ -173,18 +170,14 @@ impl super::View for MainView<'_> {
                 self.filter.render(&filter_props, *filter_rect, frame);
             }
 
-            // Calculate vertical split (containers/logs vs charts/ports)
             let upper_main = Self::calculate_vertical_split(model, whole_layout[1]);
 
-            // Calculate containers/logs area
             let containers_logs_section =
                 Self::calculate_containers_logs_split(model, upper_main[0]);
 
-            // Calculate containers/commands split
             let containers_commands =
                 Self::calculate_containers_commands_split(model, containers_logs_section[0]);
 
-            // Render containers
             let containers_props =
                 crate::ui::components::panels::containers::ContainersPanelProps {
                     view_model: model,
@@ -195,7 +188,6 @@ impl super::View for MainView<'_> {
             self.containers
                 .render(&containers_props, containers_commands[0], frame);
 
-            // Render logs if visible
             if model.show_logs && containers_logs_section.len() > 1 {
                 let logs_props = crate::ui::components::panels::logs::LogsPanelProps {
                     view_model: model,
@@ -207,9 +199,7 @@ impl super::View for MainView<'_> {
                     .render(&logs_props, containers_logs_section[1], frame);
             }
 
-            // Render commands and lower section if there are containers
             if model.has_containers {
-                // Render commands panel
                 if let Some(commands_rect) = containers_commands.get(1) {
                     let commands_props =
                         crate::ui::components::panels::commands::CommandsPanelProps {
@@ -221,12 +211,9 @@ impl super::View for MainView<'_> {
                     self.commands.render(&commands_props, *commands_rect, frame);
                 }
 
-                // Only render charts/ports if we have vertical space
                 if upper_main.len() > 1 && upper_main[1].height > 4 {
-                    // Calculate and render charts/ports
                     let lower = Self::calculate_charts_ports_split(model, upper_main[1]);
 
-                    // Render charts only if area is valid
                     if lower.len() >= 2 && lower[0].width > 10 && lower[0].height > 5 {
                         let charts_props =
                             crate::ui::components::panels::charts::ChartsPanelProps {
@@ -236,7 +223,6 @@ impl super::View for MainView<'_> {
                         self.charts.render(&charts_props, lower[0], frame);
                     }
 
-                    // Render ports
                     if lower.len() >= 2 && lower[1].width > 2 && lower[1].height > 2 {
                         let ports_props = crate::ui::components::panels::ports::PortsPanelProps {
                             view_model: model,
@@ -316,6 +302,24 @@ impl super::View for MainView<'_> {
                 theme,
             };
             self.info_box.render(&info_props, frame.area(), frame);
+        }
+
+        // Loading indicator
+        if self.gui_state.lock().is_loading() {
+            let gui_state = self.gui_state.lock();
+            let loading_indicator = LoadingIndicator::new(&gui_state);
+
+            // Position the loading indicator in the top-right corner
+            let area = frame.area();
+            let loading_area = Rect {
+                x: area.width.saturating_sub(25),
+                y: 0,
+                width: 25.min(area.width),
+                height: 3.min(area.height),
+            };
+
+            loading_indicator.render(frame, loading_area);
+            drop(gui_state);
         }
 
         // Help panel

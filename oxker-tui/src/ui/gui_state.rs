@@ -96,6 +96,8 @@ pub struct GuiState {
     loading_handle: Option<JoinHandle<()>>,
     loading_index: u8,
     loading_set: HashSet<Uuid>,
+    pub loading_uuids: HashSet<Uuid>,
+    loading_uuid_timestamps: HashMap<Uuid, Instant>,
     log_height: u16,
     rerender: Arc<Rerender>,
     selected_panel: SelectablePanel,
@@ -122,6 +124,8 @@ impl GuiState {
             loading_handle: None,
             loading_index: 0,
             loading_set: HashSet::new(),
+            loading_uuids: HashSet::new(),
+            loading_uuid_timestamps: HashMap::new(),
             log_height: 75,
             screen_width: 0,
             rerender: Arc::clone(redraw),
@@ -396,7 +400,7 @@ impl GuiState {
 
     #[must_use]
     pub fn is_loading(&self) -> bool {
-        !self.loading_set.is_empty()
+        !self.loading_set.is_empty() || !self.loading_uuids.is_empty()
     }
     /// If is_loading has any entries, return the char at FRAMES[index], else an empty char, which needs to take up the same space, hence ' '
     #[must_use]
@@ -433,6 +437,53 @@ impl GuiState {
                 h.abort();
             }
             self.loading_handle = None;
+        }
+    }
+
+    /// Add a loading UUID to track ongoing operations
+    pub fn add_loading_uuid(&mut self, uuid: Uuid) {
+        self.loading_uuids.insert(uuid);
+        self.loading_uuid_timestamps.insert(uuid, Instant::now());
+
+        // Clean up old UUIDs (older than 5 minutes)
+        self.cleanup_old_loading_uuids();
+
+        // Debug logging if HashSet is getting large
+        if self.loading_uuids.len() > 10 {
+            tracing::debug!("Loading UUIDs HashSet size: {}", self.loading_uuids.len());
+        }
+
+        self.rerender.update_draw();
+    }
+
+    /// Remove a loading UUID when operation completes
+    pub fn remove_loading_uuid(&mut self, uuid: Uuid) {
+        self.loading_uuids.remove(&uuid);
+        self.loading_uuid_timestamps.remove(&uuid);
+        self.rerender.update_draw();
+    }
+
+    /// Clean up UUIDs older than 5 minutes to prevent memory leaks
+    fn cleanup_old_loading_uuids(&mut self) {
+        let now = Instant::now();
+        let five_minutes = std::time::Duration::from_secs(300);
+
+        let expired_uuids: Vec<Uuid> = self
+            .loading_uuid_timestamps
+            .iter()
+            .filter_map(|(uuid, timestamp)| {
+                if now.duration_since(*timestamp) > five_minutes {
+                    Some(*uuid)
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for uuid in expired_uuids {
+            self.loading_uuids.remove(&uuid);
+            self.loading_uuid_timestamps.remove(&uuid);
+            tracing::warn!("Cleaned up expired loading UUID: {}", uuid);
         }
     }
 
@@ -504,5 +555,139 @@ impl GuiState {
             self.ui_logs_position += 1;
             self.rerender.update_draw();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn test_add_remove_loading_uuid() {
+        let rerender = Arc::new(Rerender::default());
+        let mut gui_state = GuiState::new(&rerender, false);
+
+        let uuid1 = Uuid::new_v4();
+        let uuid2 = Uuid::new_v4();
+
+        // Initially not loading
+        assert!(!gui_state.is_loading());
+
+        // Add first UUID
+        gui_state.add_loading_uuid(uuid1);
+        assert!(gui_state.is_loading());
+        assert!(gui_state.loading_uuids.contains(&uuid1));
+        assert!(gui_state.loading_uuid_timestamps.contains_key(&uuid1));
+
+        // Add second UUID
+        gui_state.add_loading_uuid(uuid2);
+        assert!(gui_state.is_loading());
+        assert_eq!(gui_state.loading_uuids.len(), 2);
+
+        // Remove first UUID
+        gui_state.remove_loading_uuid(uuid1);
+        assert!(gui_state.is_loading()); // Still loading with uuid2
+        assert!(!gui_state.loading_uuids.contains(&uuid1));
+        assert!(!gui_state.loading_uuid_timestamps.contains_key(&uuid1));
+
+        // Remove second UUID
+        gui_state.remove_loading_uuid(uuid2);
+        assert!(!gui_state.is_loading()); // No longer loading
+        assert!(gui_state.loading_uuids.is_empty());
+        assert!(gui_state.loading_uuid_timestamps.is_empty());
+    }
+
+    #[test]
+    fn test_is_loading_state_transitions() {
+        let rerender = Arc::new(Rerender::default());
+        let mut gui_state = GuiState::new(&rerender, false);
+
+        // Initially not loading
+        assert!(!gui_state.is_loading());
+
+        let uuid = Uuid::new_v4();
+
+        // Transition to loading
+        gui_state.add_loading_uuid(uuid);
+        assert!(gui_state.is_loading());
+
+        // Transition back to not loading
+        gui_state.remove_loading_uuid(uuid);
+        assert!(!gui_state.is_loading());
+    }
+
+    #[test]
+    fn test_cleanup_old_loading_uuids() {
+        let rerender = Arc::new(Rerender::default());
+        let mut gui_state = GuiState::new(&rerender, false);
+
+        let old_uuid = Uuid::new_v4();
+        let recent_uuid = Uuid::new_v4();
+
+        // Add an old UUID (simulate 6 minutes ago)
+        gui_state.loading_uuids.insert(old_uuid);
+        let six_minutes_ago = Instant::now()
+            .checked_sub(std::time::Duration::from_secs(360))
+            .unwrap();
+        gui_state
+            .loading_uuid_timestamps
+            .insert(old_uuid, six_minutes_ago);
+
+        // Add a recent UUID
+        gui_state.add_loading_uuid(recent_uuid);
+
+        // Cleanup should have removed the old UUID
+        assert!(!gui_state.loading_uuids.contains(&old_uuid));
+        assert!(!gui_state.loading_uuid_timestamps.contains_key(&old_uuid));
+
+        // Recent UUID should still be present
+        assert!(gui_state.loading_uuids.contains(&recent_uuid));
+        assert!(gui_state.loading_uuid_timestamps.contains_key(&recent_uuid));
+    }
+
+    #[test]
+    fn test_multiple_concurrent_loading_uuids() {
+        let rerender = Arc::new(Rerender::default());
+        let mut gui_state = GuiState::new(&rerender, false);
+
+        let mut uuids = Vec::new();
+
+        // Add 15 UUIDs to test debug logging threshold
+        for _ in 0..15 {
+            let uuid = Uuid::new_v4();
+            uuids.push(uuid);
+            gui_state.add_loading_uuid(uuid);
+        }
+
+        assert!(gui_state.is_loading());
+        assert_eq!(gui_state.loading_uuids.len(), 15);
+        assert_eq!(gui_state.loading_uuid_timestamps.len(), 15);
+
+        // Remove all UUIDs
+        for uuid in uuids {
+            gui_state.remove_loading_uuid(uuid);
+        }
+
+        assert!(!gui_state.is_loading());
+        assert!(gui_state.loading_uuids.is_empty());
+        assert!(gui_state.loading_uuid_timestamps.is_empty());
+    }
+
+    #[test]
+    fn test_loading_char_display() {
+        let rerender = Arc::new(Rerender::default());
+        let mut gui_state = GuiState::new(&rerender, false);
+
+        // When not loading, should return space
+        assert_eq!(gui_state.get_loading(), ' ');
+
+        let uuid = Uuid::new_v4();
+        gui_state.add_loading_uuid(uuid);
+
+        // When loading, should return a frame character
+        let loading_char = gui_state.get_loading();
+        assert_ne!(loading_char, ' ');
+        assert!(FRAMES.contains(&loading_char));
     }
 }
