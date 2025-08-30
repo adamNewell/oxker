@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use oxker_core::{app_data::ContainerId, tty_readable};
 use oxker_tui::{
     handlers::UIContainerState,
@@ -8,7 +10,6 @@ use std::sync::Arc;
 
 #[test]
 fn test_exec_with_oxker_container() {
-    // Test that exec is prevented when running inside oxker container
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -39,7 +40,6 @@ fn test_exec_without_tty() {
 
 #[test]
 fn test_exec_with_invalid_container_id() {
-    // Test exec with various invalid container IDs
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -61,7 +61,6 @@ fn test_exec_with_invalid_container_id() {
 
 #[test]
 fn test_exec_state_cleared_on_error() {
-    // Test that exec state is properly cleared when errors occur
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -83,7 +82,6 @@ fn test_exec_state_cleared_on_error() {
 
 #[test]
 fn test_exec_blocked_by_other_statuses() {
-    // Test exec behavior when other blocking statuses are active
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -101,13 +99,13 @@ fn test_exec_blocked_by_other_statuses() {
 
 #[test]
 fn test_container_selection_edge_cases() {
-    // Test edge cases in container selection
     let container_state = Arc::new(Mutex::new(UIContainerState::new()));
 
     // Initially no container selected
     {
         let state = container_state.lock();
         assert_eq!(state.selected_container_id, None);
+        drop(state); // Drop lock early
     }
 
     // Set and clear selection
@@ -124,12 +122,12 @@ fn test_container_selection_edge_cases() {
     {
         let state = container_state.lock();
         assert_eq!(state.selected_container_id, None);
+        drop(state);
     }
 }
 
 #[test]
 fn test_exec_terminal_error_recovery() {
-    // Test recovery from terminal errors during exec
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -151,13 +149,12 @@ fn test_exec_terminal_error_recovery() {
 
 #[test]
 fn test_rapid_exec_state_changes() {
-    // Test rapid state changes don't cause issues
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
     // Rapidly toggle exec state
     for i in 0..10 {
-        let container_id = ContainerId::from(format!("container_{}", i).as_str());
+        let container_id = ContainerId::from(format!("container_{i}").as_str());
 
         // Set
         gui_state.set_exec_container_id(Some(container_id.clone()));
@@ -172,7 +169,6 @@ fn test_rapid_exec_state_changes() {
 
 #[test]
 fn test_exec_with_filter_active() {
-    // Test exec behavior when filter is active
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -191,7 +187,6 @@ fn test_exec_with_filter_active() {
 
 #[test]
 fn test_exec_info_messages() {
-    // Test info box messages for various exec scenarios
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -215,7 +210,6 @@ mod integration_error_tests {
 
     #[tokio::test]
     async fn test_exec_error_workflow() {
-        // Test complete error workflow
         let rerender = Arc::new(Rerender::new());
         let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, false)));
         let container_state = Arc::new(Mutex::new(UIContainerState::new()));
@@ -224,6 +218,7 @@ mod integration_error_tests {
         {
             let ui_state = container_state.lock();
             assert_eq!(ui_state.selected_container_id, None);
+            drop(ui_state);
         }
 
         // Attempt exec without container
@@ -240,6 +235,7 @@ mod integration_error_tests {
             let (text, _) = gui.info_box_text.as_ref().unwrap();
             assert!(text.contains("No container selected"));
             assert!(!gui.get_status().contains(&Status::Exec));
+            drop(gui);
         }
     }
 
@@ -252,7 +248,8 @@ mod integration_error_tests {
         {
             // On Unix, TTY might be available depending on environment
             // In CI or containers, it might not be
-            assert!(is_readable || !is_readable); // Always true, just test the function
+            // Just verify the function runs without panicking
+            let _ = is_readable;
         }
 
         #[cfg(windows)]

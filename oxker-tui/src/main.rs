@@ -236,6 +236,11 @@ pub mod tests {
         }
     }
 
+    /// Generates a test container item.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the index cannot be converted to u64.
     #[must_use]
     pub fn gen_item(id: &ContainerId, index: usize) -> ContainerItem {
         ContainerItem::new(ContainerItemInit {
@@ -276,6 +281,12 @@ pub mod tests {
         (vec![id1, id2, id3], containers)
     }
 
+    /// Generates a test container summary.
+    /// 
+    /// # Panics
+    /// 
+    /// Panics if the state string cannot be parsed as a valid container state enum,
+    /// or if the index cannot be converted to i64.
     #[must_use]
     pub fn gen_container_summary(index: usize, state: &str) -> ContainerSummary {
         ContainerSummary {
@@ -285,7 +296,7 @@ pub mod tests {
             image: Some(format!("image_{index}")),
             image_id: Some(format!("{index}")),
             command: None,
-            created: Some(i64::try_from(index).unwrap()),
+            created: Some(i64::try_from(index).expect("index should fit in i64")),
             ports: Some(vec![Port {
                 ip: None,
                 private_port: u16::try_from(index).unwrap_or(1) + 8000,

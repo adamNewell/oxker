@@ -1,4 +1,5 @@
 #![allow(clippy::unwrap_used)]
+#![allow(clippy::significant_drop_tightening)]
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use oxker_core::{

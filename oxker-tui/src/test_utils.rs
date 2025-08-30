@@ -4,6 +4,7 @@ pub mod mock_core_handle;
 mod mock_core_handle_test;
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 pub mod test_utils {
     use crate::handlers::UIContainerState;
     use crate::ui::{FrameViewModel, GuiState, Rerender};
@@ -16,13 +17,18 @@ pub mod test_utils {
     use std::collections::VecDeque;
     use std::sync::Arc;
 
-    /// Test configuration builder
     pub struct TestConfigBuilder {
         config: Config,
     }
 
+    impl Default for TestConfigBuilder {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl TestConfigBuilder {
-        pub fn new() -> Self {
+        #[must_use] pub fn new() -> Self {
             Self {
                 config: Config {
                     app_colors: AppColors::new(),
@@ -44,17 +50,17 @@ pub mod test_utils {
             }
         }
 
-        pub fn with_show_logs(mut self, show: bool) -> Self {
+        #[must_use] pub fn with_show_logs(mut self, show: bool) -> Self {
             self.config.show_logs = show;
             self
         }
 
-        pub fn with_colors(mut self, colors: AppColors) -> Self {
+        #[must_use] pub fn with_colors(mut self, colors: AppColors) -> Self {
             self.config.app_colors = colors;
             self
         }
 
-        pub fn build(self) -> Config {
+        #[must_use] pub fn build(self) -> Config {
             self.config
         }
     }
@@ -75,11 +81,11 @@ pub mod test_utils {
     }
 
     impl TestContainerBuilder {
-        pub fn new(id: &str) -> Self {
+        #[must_use] pub fn new(id: &str) -> Self {
             Self {
                 id: ContainerId::from(id),
-                name: format!("container_{}", id),
-                image: format!("image_{}", id),
+                name: format!("container_{id}"),
+                image: format!("image_{id}"),
                 state: State::Running(RunningState::Healthy),
                 status: ContainerStatus::from("Up 1 hour".to_string()),
                 ports: vec![],
@@ -91,22 +97,22 @@ pub mod test_utils {
             }
         }
 
-        pub fn with_name(mut self, name: &str) -> Self {
+        #[must_use] pub fn with_name(mut self, name: &str) -> Self {
             self.name = name.to_string();
             self
         }
 
-        pub fn with_image(mut self, image: &str) -> Self {
+        #[must_use] pub fn with_image(mut self, image: &str) -> Self {
             self.image = image.to_string();
             self
         }
 
-        pub fn with_state(mut self, state: State) -> Self {
+        #[must_use] pub fn with_state(mut self, state: State) -> Self {
             self.state = state;
             self
         }
 
-        pub fn with_port(mut self, private: u16, public: Option<u16>) -> Self {
+        #[must_use] pub fn with_port(mut self, private: u16, public: Option<u16>) -> Self {
             self.ports.push(ContainerPorts {
                 ip: None,
                 private,
@@ -115,17 +121,19 @@ pub mod test_utils {
             self
         }
 
+        #[must_use]
         pub fn with_cpu_stats(mut self, stats: Vec<f64>) -> Self {
             self.cpu_stats = stats.into_iter().map(CpuStats::new).collect();
             self
         }
 
+        #[must_use]
         pub fn with_memory_stats(mut self, stats: Vec<u64>) -> Self {
             self.mem_stats = stats.into_iter().map(ByteStats::new).collect();
             self
         }
 
-        pub fn build(self) -> ContainerItem {
+        #[must_use] pub fn build(self) -> ContainerItem {
             let mut container = ContainerItem::new(ContainerItemInit {
                 created: 0, // index
                 id: self.id,
@@ -148,7 +156,6 @@ pub mod test_utils {
         }
     }
 
-    /// Test setup structure that provides all necessary components
     pub struct TestSetup {
         pub core_handle: CoreHandle,
         pub gui_state: Arc<Mutex<GuiState>>,
@@ -158,7 +165,7 @@ pub mod test_utils {
     }
 
     impl TestSetup {
-        pub fn new(width: u16, height: u16, show_logs: bool) -> Self {
+        #[must_use] pub fn new(width: u16, height: u16, show_logs: bool) -> Self {
             let config = TestConfigBuilder::new().with_show_logs(show_logs).build();
 
             let (event_bus, _receiver) = EventBus::new(10);
@@ -180,7 +187,7 @@ pub mod test_utils {
         }
 
         /// Add containers to the UI state
-        pub fn with_containers(self, containers: Vec<ContainerItem>) -> Self {
+        #[must_use] pub fn with_containers(self, containers: Vec<ContainerItem>) -> Self {
             use oxker_core::events::types::ContainerItem as EventContainerItem;
 
             let event_containers: Vec<EventContainerItem> = containers
@@ -209,11 +216,11 @@ pub mod test_utils {
             self
         }
 
-        /// Add logs to the selected container
-        pub fn with_logs(self, logs: Vec<&str>) -> Self {
+        #[must_use] pub fn with_logs(self, logs: Vec<&str>) -> Self {
             use oxker_core::events::types::LogLine;
 
-            if let Some(container_id) = self.container_state.lock().get_selected_container_id() {
+            let container_id = self.container_state.lock().get_selected_container_id();
+            if let Some(container_id) = container_id {
                 let log_lines: Vec<LogLine> = logs
                     .into_iter()
                     .map(|msg| LogLine {
@@ -231,8 +238,7 @@ pub mod test_utils {
             self
         }
 
-        /// Add CPU stats to a container
-        pub fn with_cpu_stats(self, container_id: &str, stats: Vec<f64>) -> Self {
+        #[must_use] pub fn with_cpu_stats(self, container_id: &str, stats: Vec<f64>) -> Self {
             use oxker_core::events::types::Stats;
 
             for (i, cpu_usage) in stats.into_iter().enumerate() {
@@ -254,22 +260,32 @@ pub mod test_utils {
         }
     }
 
-    /// Test terminal for capturing rendered output
     pub struct TestTerminal {
         terminal: ratatui::Terminal<ratatui::backend::TestBackend>,
     }
 
     impl TestTerminal {
+        /// Creates a new test terminal with the specified dimensions.
+        /// 
+        /// # Panics
+        /// 
+        /// Panics if the terminal cannot be created with the test backend.
+        #[must_use] 
         pub fn new(width: u16, height: u16) -> Self {
             let backend = ratatui::backend::TestBackend::new(width, height);
             let terminal = ratatui::Terminal::new(backend).unwrap();
             Self { terminal }
         }
 
-        pub fn buffer(&self) -> &ratatui::buffer::Buffer {
+        #[must_use] pub fn buffer(&self) -> &ratatui::buffer::Buffer {
             self.terminal.backend().buffer()
         }
 
+        /// Draws content to the test terminal.
+        /// 
+        /// # Errors
+        /// 
+        /// Returns an error if the terminal draw operation fails.
         pub fn draw<F>(&mut self, f: F) -> Result<(), Box<dyn std::error::Error>>
         where
             F: FnOnce(&mut ratatui::Frame),
@@ -279,16 +295,15 @@ pub mod test_utils {
         }
     }
 
-    /// Generate test containers
-    pub fn gen_containers() -> (Vec<ContainerId>, Vec<ContainerItem>) {
+    #[must_use] pub fn gen_containers() -> (Vec<ContainerId>, Vec<ContainerItem>) {
         gen_containers_n(3)
     }
 
-    pub fn gen_containers_n(n: usize) -> (Vec<ContainerId>, Vec<ContainerItem>) {
+    #[must_use] pub fn gen_containers_n(n: usize) -> (Vec<ContainerId>, Vec<ContainerItem>) {
         let mut ids = Vec::new();
         let items = (1..=n)
             .map(|index| {
-                let id = ContainerId::from(format!("{}", index).as_str());
+                let id = ContainerId::from(format!("{index}").as_str());
                 ids.push(id.clone());
                 gen_item(&id, index)
             })
@@ -300,9 +315,9 @@ pub mod test_utils {
         ContainerItem::new(ContainerItemInit {
             created: u64::try_from(index).unwrap(),
             id: id.clone(),
-            image: format!("image_{}", index),
+            image: format!("image_{index}"),
             is_oxker: false,
-            name: format!("container_{}", index),
+            name: format!("container_{index}"),
             ports: vec![ContainerPorts {
                 ip: None,
                 private: u16::try_from(index).unwrap_or(1) + 8000,
@@ -313,18 +328,17 @@ pub mod test_utils {
         })
     }
 
-    /// Generate test AppData
-    pub fn gen_appdata(_containers: &[ContainerItem]) -> oxker_core::AppData {
+    #[must_use] pub fn gen_appdata(_containers: &[ContainerItem]) -> oxker_core::AppData {
         let (event_bus, _receiver) = EventBus::new(100);
         let event_bus = Arc::new(event_bus);
-        let app_data = oxker_core::AppData::new(gen_config(), event_bus);
+        
         // Note: This is a workaround for tests - containers field is private
         // In real code, we'd use the public API methods
-        app_data
+        oxker_core::AppData::new(gen_config(), event_bus)
     }
 
     /// Default test config
-    pub fn gen_config() -> Config {
+    #[must_use] pub fn gen_config() -> Config {
         Config {
             color_logs: false,
             docker_interval_ms: 1000,
@@ -344,7 +358,6 @@ pub mod test_utils {
         }
     }
 
-    /// Helper to create FrameViewModel for tests
     pub fn create_test_frame_view_model(
         gui_state: &Arc<Mutex<GuiState>>,
         container_state: &Arc<Mutex<UIContainerState>>,

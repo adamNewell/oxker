@@ -1,5 +1,6 @@
 //! Comprehensive snapshot tests for all UI components
 //! This ensures complete UI regression test coverage
+#![allow(clippy::expect_used)]
 
 use insta::assert_snapshot;
 use oxker_core::{
@@ -26,7 +27,7 @@ impl TestContainerBuilder {
     fn new(id: &str) -> Self {
         Self {
             id: ContainerId::from(id),
-            name: format!("container_{}", id),
+            name: format!("container_{id}"),
             image: "test_image:latest".to_string(),
             state: State::Running(RunningState::Healthy),
             status: ContainerStatus::from("Up 1 hour".to_string()),
@@ -47,7 +48,7 @@ impl TestContainerBuilder {
         self
     }
 
-    fn with_state(mut self, state: State) -> Self {
+    const fn with_state(mut self, state: State) -> Self {
         self.state = state;
         self
     }
@@ -67,7 +68,7 @@ impl TestContainerBuilder {
         self
     }
 
-    fn with_mem_limit(mut self, limit: u64) -> Self {
+    const fn with_mem_limit(mut self, limit: u64) -> Self {
         self.mem_limit = ByteStats::new(limit);
         self
     }
@@ -136,13 +137,13 @@ fn render_component<'a, C: Component<'a>>(
     height: u16,
 ) -> String {
     let backend = TestBackend::new(width, height);
-    let mut terminal = Terminal::new(backend).unwrap();
+    let mut terminal = Terminal::new(backend).expect("Failed to create test terminal");
 
     terminal
         .draw(|f| {
             component.render(props, f.area(), f);
         })
-        .unwrap();
+        .expect("Failed to draw to terminal");
 
     terminal_to_string(&terminal, width, height)
 }
@@ -186,8 +187,8 @@ fn test_charts_panel_snapshots() {
     );
 
     // Test with data
-    let cpu_data = vec![25.5, 30.0, 28.3, 32.1, 29.7];
-    let mem_data = vec![
+    let cpu_data = [25.5, 30.0, 28.3, 32.1, 29.7];
+    let mem_data = [
         ByteStats::new(1024 * 1024 * 100), // 100MB
         ByteStats::new(1024 * 1024 * 120), // 120MB
         ByteStats::new(1024 * 1024 * 115), // 115MB
@@ -198,12 +199,20 @@ fn test_charts_panel_snapshots() {
     let cpu_chart_data: Vec<(f64, f64)> = cpu_data
         .iter()
         .enumerate()
-        .map(|(i, &v)| (i as f64, v))
+        .map(|(i, &v)| {
+            // Safe conversion: chart indices won't exceed f64 precision
+            #[allow(clippy::cast_precision_loss)]
+            (i as f64, v)
+        })
         .collect();
     let mem_chart_data: Vec<(f64, f64)> = mem_data
         .iter()
         .enumerate()
-        .map(|(i, v)| (i as f64, v.get_value()))
+        .map(|(i, v)| {
+            // Safe conversion: chart indices won't exceed f64 precision
+            #[allow(clippy::cast_precision_loss)]
+            (i as f64, v.get_value())
+        })
         .collect();
 
     view_model.chart_data = Some(oxker_tui::ui::ChartData {
@@ -704,7 +713,7 @@ fn test_combined_ui_layouts() {
                 &FilterPanelProps {
                     filter_by: FilterBy::Name,
                     filter_term: Some("web".to_string()),
-                    theme: theme.clone(),
+                    theme,
                 },
                 chunks[0],
                 f,
@@ -760,24 +769,28 @@ fn test_combined_ui_layouts() {
 
             // Render charts
             let charts_panel = ChartsPanel::new();
-            let cpu_data = vec![20.0, 25.0, 30.0, 28.0, 26.0];
-            let mem_data = vec![
-                ByteStats::new(100 * 1024 * 1024),
+            let cpu_data = [20.0, 25.0, 30.0, 28.0, 26.0];
+            let mem_data = [ByteStats::new(100 * 1024 * 1024),
                 ByteStats::new(120 * 1024 * 1024),
                 ByteStats::new(115 * 1024 * 1024),
                 ByteStats::new(125 * 1024 * 1024),
-                ByteStats::new(118 * 1024 * 1024),
-            ];
+                ByteStats::new(118 * 1024 * 1024)];
 
             let cpu_chart_data: Vec<(f64, f64)> = cpu_data
                 .iter()
                 .enumerate()
-                .map(|(i, &v)| (i as f64, v))
+                .map(|(i, &v)| {
+                    #[allow(clippy::cast_precision_loss)]
+                    (i as f64, v)
+                })
                 .collect();
             let mem_chart_data: Vec<(f64, f64)> = mem_data
                 .iter()
                 .enumerate()
-                .map(|(i, v)| (i as f64, v.get_value()))
+                .map(|(i, v)| {
+                    #[allow(clippy::cast_precision_loss)]
+                    (i as f64, v.get_value())
+                })
                 .collect();
 
             view_model.chart_data = Some(oxker_tui::ui::ChartData {

@@ -27,7 +27,6 @@ fn main() {
         raw_logs: false,
         show_std_err: false,
         host: None,
-        use_cli: false,
     };
 
     let rerender = Arc::new(Rerender::new());
@@ -49,14 +48,15 @@ fn main() {
     container_state.lock().update_containers(test_containers);
 
     // Add some stats
-    for i in 1..=10 {
+    for i in 1..=10u64 {
         let stats = Stats {
             container_id: format!("container_{i}"),
+            #[allow(clippy::cast_precision_loss)]
             cpu_usage: (i as f64) * 2.5,
-            memory_usage: i as u64 * 1024 * 1024 * 10,
+            memory_usage: i * 1024 * 1024 * 10,
             memory_limit: 1024 * 1024 * 1024,
-            network_rx: i as u64 * 1000,
-            network_tx: i as u64 * 500,
+            network_rx: i * 1000,
+            network_tx: i * 500,
         };
         container_state
             .lock()

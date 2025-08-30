@@ -22,10 +22,8 @@ const fn gen_config() -> Config {
 
 #[tokio::test]
 async fn test_event_system_integration() {
-    // Create event bus with receiver
     let (event_bus, mut receiver) = EventBus::new(100);
 
-    // Create core handle
     let config = gen_config();
     let handle = CoreHandle::new(event_bus, &config);
 
@@ -39,20 +37,14 @@ async fn test_event_system_integration() {
     let mut found_update = false;
     let timeout = tokio::time::timeout(tokio::time::Duration::from_secs(2), async {
         while let Some(event) = receiver.recv().await {
-            match event {
-                CoreEvent::ContainerListUpdate(containers) => {
-                    // With real Docker integration, we may or may not have containers
-                    // Just verify we got a containers list (could be empty)
-                    let _ = containers;
-                    found_update = true;
-                    break;
-                }
-                CoreEvent::ContainerListUpdated => {
-                    // May receive this from filter initialization
-                    continue;
-                }
-                _ => {}
+            if let CoreEvent::ContainerListUpdate(containers) = event {
+                // With real Docker integration, we may or may not have containers
+                // Just verify we got a containers list (could be empty)
+                let _ = containers;
+                found_update = true;
+                break;
             }
+            // May receive this from filter initialization or other events
         }
     })
     .await;
@@ -92,14 +84,14 @@ async fn test_multiple_commands_and_events() {
     let mut events = Vec::new();
     let timeout = tokio::time::timeout(tokio::time::Duration::from_secs(3), async {
         while let Some(event) = receiver.recv().await {
-            eprintln!("Received event: {:?}", event);
+            eprintln!("Received event: {event:?}");
             // Skip ContainerListUpdated events from filter initialization
             if matches!(event, CoreEvent::ContainerListUpdated) {
                 continue;
             }
             events.push(event);
             // We need at least ContainerListUpdate, but logs might not come if container doesn't exist
-            if events.len() >= 1 {
+            if !events.is_empty() {
                 // Give a bit more time for other events
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 while let Ok(event) = receiver.try_recv() {

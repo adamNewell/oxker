@@ -54,10 +54,3 @@ async fn test_mock_handle_command_recording() {
     mock_handle.clear_commands();
     assert_eq!(mock_handle.get_commands().len(), 0);
 }
-
-#[tokio::test]
-async fn test_component_tests_pass() {
-    // This test ensures the component tests remain isolated
-    // The actual component tests are in filter_component_test.rs and help_component_test.rs
-    assert!(true);
-}

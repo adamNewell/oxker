@@ -1,6 +1,7 @@
 #![allow(clippy::unwrap_used)]
 
 use std::fs::File;
+use std::fmt::Write as FmtWrite;
 use std::io::Write;
 use std::time::{Duration, Instant};
 
@@ -48,13 +49,14 @@ fn main() {
         let med = measure_mock_panel_render(panel, loads[1]);
         let high = measure_mock_panel_render(panel, loads[2]);
 
-        results.push_str(&format!(
-            "| {} | {:.1} | {:.1} | {:.1} |\n",
+        let _ = writeln!(
+            results,
+            "| {} | {:.1} | {:.1} | {:.1} |",
             panel,
             low.as_micros() as f64,
             med.as_micros() as f64,
             high.as_micros() as f64,
-        ));
+        );
     }
 
     results.push_str("\n## Target Performance\n");

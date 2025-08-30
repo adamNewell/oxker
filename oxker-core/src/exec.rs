@@ -1,6 +1,10 @@
 use std::io::Write;
 
-use crate::{app_data::ContainerId, app_error::AppError};
+use crate::{
+    app_data::ContainerId,
+    app_error::AppError,
+    docker_cli::{DockerCliDetector, DockerCliStatus},
+};
 
 /// TTY location
 const TTY: &str = "/dev/tty";
@@ -28,6 +32,31 @@ pub fn tty_readable() -> bool {
 ///
 /// Returns an error if the docker CLI command fails or terminal operations fail
 pub fn exec_docker_cli(id: &ContainerId) -> Result<(), AppError> {
+    // First check if Docker CLI is available
+    let mut detector = DockerCliDetector::new();
+    match detector.detect() {
+        DockerCliStatus::Available => {
+            // Docker is available, proceed with exec
+        }
+        DockerCliStatus::NotFound => {
+            return Err(AppError::DockerNotFound);
+        }
+        DockerCliStatus::NotInPath(paths) => {
+            let detail = if paths.is_empty() {
+                "Docker found but not in PATH".to_string()
+            } else {
+                format!("Docker found at: {}, but not in PATH", paths.join(", "))
+            };
+            return Err(AppError::DockerNotAccessible(detail));
+        }
+        DockerCliStatus::PermissionDenied(msg) => {
+            return Err(AppError::DockerNotAccessible(msg));
+        }
+        DockerCliStatus::DaemonNotRunning => {
+            return Err(AppError::DockerDaemonNotRunning);
+        }
+    }
+
     // Clear screen and reset cursor
     print!("\x1B[2J\x1B[H");
     std::io::stdout().flush().map_err(|_| AppError::Terminal)?;
@@ -38,9 +67,27 @@ pub fn exec_docker_cli(id: &ContainerId) -> Result<(), AppError> {
         .stdout(std::process::Stdio::inherit())
         .stderr(std::process::Stdio::inherit())
         .spawn()
-        .map_err(|_| AppError::Terminal)?;
+        .map_err(|e| {
+            // Handle specific error cases from spawning the process
+            match e.kind() {
+                std::io::ErrorKind::NotFound => AppError::DockerNotFound,
+                std::io::ErrorKind::PermissionDenied => {
+                    AppError::DockerNotAccessible("Permission denied executing docker".to_string())
+                }
+                _ => AppError::Terminal,
+            }
+        })?;
 
-    child.wait().map_err(|_| AppError::Terminal)?;
+    let status = child.wait().map_err(|_| AppError::Terminal)?;
+    
+    // Check if the command executed successfully
+    if !status.success() {
+        // Check if container was not found or not running
+        // Note: We can't easily distinguish these without capturing stderr,
+        // but we can provide a general error message that covers both cases
+        return Err(AppError::DockerExec);
+    }
+    
     Ok(())
 }
 
@@ -84,7 +131,7 @@ mod tests {
 
         // The expected command would be:
         // docker exec -it test_container_123 sh
-        let expected_args = vec!["exec", "-it", "test_container_123", "sh"];
+        let expected_args = ["exec", "-it", "test_container_123", "sh"];
 
         // Verify our constants match expected values
         assert_eq!(command::DOCKER, "docker");

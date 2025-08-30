@@ -278,8 +278,8 @@ impl super::View for MainView<'_> {
         }
 
         // Command confirmation dialog
-        if model.status.contains(&Status::CommandConfirm) {
-            if let Some((command, container_id)) = self.gui_state.lock().get_command_confirm() {
+        if model.status.contains(&Status::CommandConfirm)
+            && let Some((command, container_id)) = self.gui_state.lock().get_command_confirm() {
                 // Find container name from UIContainerState
                 let container_name = self
                     .container_state
@@ -304,7 +304,6 @@ impl super::View for MainView<'_> {
                     self.gui_state.lock().set_command_confirm(None);
                 }
             }
-        }
 
         // Info box
         if let Some((text, instant)) = model.info_text.as_ref() {

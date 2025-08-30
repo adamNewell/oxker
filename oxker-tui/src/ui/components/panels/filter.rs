@@ -59,7 +59,6 @@ impl FilterPanel {
             .collect()
     }
 
-    /// Create the control button spans
     fn create_control_spans(props: &FilterPanelProps) -> Vec<Span<'static>> {
         let style_button = Style::default()
             .fg(props.theme.filter.selected_filter_text.into_ratatui_color())
@@ -181,7 +180,7 @@ mod tests {
                 .unwrap();
 
             // Just verify it renders without panic
-            assert!(true);
+            // Test passes if no panic occurs
         }
     }
 }

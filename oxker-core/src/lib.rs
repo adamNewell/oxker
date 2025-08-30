@@ -11,6 +11,7 @@
 pub mod app_data;
 pub mod app_error;
 pub mod config;
+pub mod docker_cli;
 pub mod docker_data;
 pub mod events;
 pub mod exec;
@@ -26,6 +27,7 @@ pub use app_data::{
 };
 pub use app_error::AppError;
 pub use config::{AppColors, Config, Keymap};
+pub use docker_cli::{DockerCliDetector, DockerCliStatus};
 pub use docker_data::{DockerData, DockerMessage};
 pub use events::{CoreCommand, CoreEvent, EventBus};
 pub use exec::{exec_docker_cli, tty_readable};
@@ -33,12 +35,10 @@ pub use exec_interface::{ExecInterface, TerminalDimensions, TerminalHandler};
 pub use handle::{CoreHandle, CoreStateView};
 pub use keys::{KeyCode, KeyModifiers};
 
-// Constants that were in main.rs, needed by config module
 pub const ENV_KEY: &str = "OXKER_RUNTIME";
 pub const ENV_VALUE: &str = "container";
 pub const ENTRY_POINT: &str = "/app/oxker";
 
-// Test utilities module
 #[cfg(test)]
 pub mod tests {
     use super::*;
@@ -131,7 +131,7 @@ pub mod tests {
                 let image = Some(item.image.get().to_string());
                 let image_id = Some(format!("{}_image_id", item.id.get()));
                 let command = Some(format!("{}_command", item.id.get()));
-                let created = Some(i64::try_from(item.created).unwrap_or(i64::from(i as i32)));
+                let created = Some(i64::try_from(item.created).unwrap_or_else(|_| i64::try_from(i).unwrap_or(0)));
                 let ports = Some(
                     item.ports
                         .iter()
@@ -143,8 +143,8 @@ pub mod tests {
                         })
                         .collect(),
                 );
-                let size_rw = Some(i64::from(i as i32 + 1));
-                let size_root_fs = Some(i64::from(i as i32 + 1));
+                let size_rw = Some(i64::try_from(i + 1).unwrap_or(1));
+                let size_root_fs = Some(i64::try_from(i + 1).unwrap_or(1));
                 let labels = None;
                 let state = match item.state {
                     State::Paused => Some(bollard::secret::ContainerSummaryStateEnum::PAUSED),

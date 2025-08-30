@@ -253,7 +253,7 @@ impl InputHandler {
     }
 
     /// Send docker command, if the Commands panel is selected
-    async fn enter_key(&self) {
+    fn enter_key(&self) {
         // This isn't great, just means you can't send docker commands before full initialization of the program
         let panel = self.gui_state.lock().get_selected_panel();
         if panel == SelectablePanel::Commands {
@@ -532,8 +532,8 @@ impl InputHandler {
                 // Update filter field and re-apply the filter if there's a term
                 self.container_state.lock().next_filter_field();
                 let filter_term = self.container_state.lock().filter_term.clone();
-                if !filter_term.is_empty() {
-                    if let Err(e) = self
+                if !filter_term.is_empty()
+                    && let Err(e) = self
                         .core_handle
                         .execute_command(CoreCommand::FilterContainers(
                             filter_term,
@@ -543,14 +543,13 @@ impl InputHandler {
                     {
                         tracing::error!("Failed to apply filter: {}", e);
                     }
-                }
             }
             KeyCode::Left => {
                 // Update filter field and re-apply the filter if there's a term
                 self.container_state.lock().prev_filter_field();
                 let filter_term = self.container_state.lock().filter_term.clone();
-                if !filter_term.is_empty() {
-                    if let Err(e) = self
+                if !filter_term.is_empty()
+                    && let Err(e) = self
                         .core_handle
                         .execute_command(CoreCommand::FilterContainers(
                             filter_term,
@@ -560,7 +559,6 @@ impl InputHandler {
                     {
                         tracing::error!("Failed to apply filter: {}", e);
                     }
-                }
             }
             _ => (),
         }
@@ -650,6 +648,7 @@ impl InputHandler {
     }
 
     /// Handle button presses in all other scenarios
+    #[allow(clippy::cognitive_complexity)]
     async fn handle_others(&mut self, key_code: KeyCode, modifier: KeyModifiers) {
         self.handle_sort(key_code).await;
         // shift key plus arrows
@@ -795,7 +794,7 @@ impl InputHandler {
                 self.logs_forward(modifier);
             }
 
-            KeyCode::Enter => self.enter_key().await,
+            KeyCode::Enter => self.enter_key(),
             _ => (),
         }
     }

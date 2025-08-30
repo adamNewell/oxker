@@ -270,7 +270,6 @@ impl UIContainerState {
         }
     }
 
-    /// Remove a container
     pub fn remove_container(&mut self, container_id: &str) {
         self.containers.items.retain(|c| c.id.get() != container_id);
         // Reset selection if needed
@@ -287,7 +286,6 @@ impl UIContainerState {
         self.increment_version();
     }
 
-    /// Get the currently selected container ID
     #[must_use]
     pub fn get_selected_container_id(&self) -> Option<ContainerId> {
         self.containers
@@ -297,7 +295,6 @@ impl UIContainerState {
             .map(|c| c.id.clone())
     }
 
-    /// Navigate to next container
     pub fn next_container(&mut self) {
         self.containers.next();
         self.clear_logs();
@@ -338,7 +335,6 @@ impl UIContainerState {
         }
     }
 
-    /// Navigate to previous container
     pub fn previous_container(&mut self) {
         self.containers.previous();
         self.clear_logs();
@@ -346,7 +342,6 @@ impl UIContainerState {
         self.increment_version();
     }
 
-    /// Navigate to first container
     pub fn first_container(&mut self) {
         self.containers.start();
         self.clear_logs();
@@ -354,7 +349,6 @@ impl UIContainerState {
         self.increment_version();
     }
 
-    /// Navigate to last container
     pub fn last_container(&mut self) {
         self.containers.end();
         self.clear_logs();
@@ -362,30 +356,25 @@ impl UIContainerState {
         self.increment_version();
     }
 
-    /// Get container items for rendering
     #[must_use]
     pub fn get_container_items(&self) -> Vec<ContainerItem> {
         self.containers.items.clone()
     }
 
-    /// Get the total number of containers
     #[must_use]
     pub const fn get_container_count(&self) -> usize {
         self.containers.items.len()
     }
 
-    /// Clear logs
     pub fn clear_logs(&mut self) {
         self.logs.clear();
     }
 
-    /// Get logs for display
     #[must_use]
     pub const fn get_logs(&self) -> &VecDeque<String> {
         &self.logs
     }
 
-    /// Navigate docker commands
     pub fn next_docker_command(&mut self) {
         self.docker_commands.next();
     }
@@ -432,18 +421,20 @@ impl UIContainerState {
             Header::Id => Header::Name,      // All -> Name
             Header::Name => Header::Image,    // Name -> Image
             Header::Image => Header::Status,  // Image -> Status
-            Header::Status => Header::Id,     // Status -> All (wrap around)
-            _ => Header::Id,                  // Default to All
+            Header::Status | Header::State | Header::Cpu | Header::Memory | Header::Rx | Header::Tx => {
+                Header::Id // Status -> All (wrap around), Default to All
+            }
         };
     }
 
     pub const fn prev_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
             Header::Id => Header::Status,     // All -> Status (wrap around)
-            Header::Name => Header::Id,       // Name -> All
+            Header::Name | Header::State | Header::Cpu | Header::Memory | Header::Rx | Header::Tx => {
+                Header::Id // Name -> All, Default to All
+            }
             Header::Image => Header::Name,    // Image -> Name
             Header::Status => Header::Image,  // Status -> Image
-            _ => Header::Id,                  // Default to All
         };
     }
 }

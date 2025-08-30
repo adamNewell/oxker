@@ -82,7 +82,7 @@ impl LogsPanel {
         let container_info = &props.view_model.log_view.title;
         
         if container_info.is_empty() {
-            format!(" Logs {}/{} ", current_position, total_logs)
+            format!(" Logs {current_position}/{total_logs} ")
         } else {
             // Extract container name and image from the existing title
             // Current format is "Logs - container_name - image_name"
@@ -95,7 +95,7 @@ impl LogsPanel {
                     parts[2]  // image name
                 )
             } else {
-                format!(" Logs {}/{} - {} ", current_position, total_logs, container_info)
+                format!(" Logs {current_position}/{total_logs} - {container_info} ")
             }
         }
     }

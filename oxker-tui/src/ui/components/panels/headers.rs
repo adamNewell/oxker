@@ -137,55 +137,55 @@ impl HeadersPanel {
         
         let (color, indicator) = get_header_style(Header::Name);
         header_spans.push(Span::styled(
-            format!("name {}                  ", indicator),
+            format!("name {indicator}                  "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::State);
         header_spans.push(Span::styled(
-            format!("state {}       ", indicator),
+            format!("state {indicator}       "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Status);
         header_spans.push(Span::styled(
-            format!("status {}                 ", indicator),
+            format!("status {indicator}                 "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Cpu);
         header_spans.push(Span::styled(
-            format!("cpu {}    ", indicator),
+            format!("cpu {indicator}    "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Memory);
         header_spans.push(Span::styled(
-            format!("memory/limit {}        ", indicator),
+            format!("memory/limit {indicator}        "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Id);
         header_spans.push(Span::styled(
-            format!("id {}      ", indicator),
+            format!("id {indicator}      "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Image);
         header_spans.push(Span::styled(
-            format!("image {}                              ", indicator),
+            format!("image {indicator}                              "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Rx);
         header_spans.push(Span::styled(
-            format!("↓ rx {}      ", indicator),
+            format!("↓ rx {indicator}      "),
             Style::default().fg(color.into_ratatui_color())
         ));
         
         let (color, indicator) = get_header_style(Header::Tx);
         header_spans.push(Span::styled(
-            format!("↑ tx {}                    ", indicator),
+            format!("↑ tx {indicator}                    "),
             Style::default().fg(color.into_ratatui_color())
         ));
 

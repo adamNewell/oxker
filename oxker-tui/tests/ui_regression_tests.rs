@@ -1,5 +1,6 @@
 //! UI regression tests using insta snapshots
 //! These tests ensure that UI components render consistently
+#![allow(clippy::unwrap_used)]
 
 use insta::{Settings, assert_snapshot};
 use oxker_core::{AppColors, FilterBy, Keymap};
@@ -57,10 +58,9 @@ fn test_filter_panel_regression() {
     let filter_panel = FilterPanel::new();
     let theme = AppColors::new();
 
-    // Test different filter states
     let test_cases = vec![
         ("no_filter", FilterBy::All, None),
-        ("name_filter_empty", FilterBy::Name, Some("".to_string())),
+        ("name_filter_empty", FilterBy::Name, Some(String::new())),
         (
             "name_filter_nginx",
             FilterBy::Name,
@@ -78,7 +78,7 @@ fn test_filter_panel_regression() {
         let props = FilterPanelProps {
             filter_by,
             filter_term,
-            theme: theme.clone(),
+            theme,
         };
 
         let output = capture_component_output(&filter_panel, &props, 80, 1);
@@ -103,7 +103,7 @@ fn test_help_panel_regression() {
         keymap: keymap.clone(),
         show_timestamp: true,
         timezone: None,
-        theme: theme.clone(),
+        theme,
     };
 
     let output = capture_component_output(&help_panel, &props, 80, 12);
@@ -111,10 +111,10 @@ fn test_help_panel_regression() {
 
     // Test without timestamp
     let props = HelpPanelProps {
-        keymap: keymap.clone(),
+        keymap,
         show_timestamp: false,
         timezone: None,
-        theme: theme.clone(),
+        theme,
     };
 
     let output = capture_component_output(&help_panel, &props, 80, 12);
@@ -169,7 +169,7 @@ fn test_ui_consistency_across_themes() {
     let props = FilterPanelProps {
         filter_by: FilterBy::Name,
         filter_term: Some("test".to_string()),
-        theme: theme.clone(),
+        theme,
     };
 
     // Capture the structure without colors

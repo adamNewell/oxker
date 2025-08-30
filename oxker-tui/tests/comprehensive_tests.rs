@@ -9,7 +9,6 @@ fn create_test_gui_state() -> Arc<Mutex<GuiState>> {
     Arc::new(Mutex::new(GuiState::new(&rerender, true)))
 }
 
-// Test AC1: Container list default sort order
 #[test]
 fn test_default_sort_by_name_ascending() {
     let ui_state = UIContainerState::new();
@@ -19,7 +18,6 @@ fn test_default_sort_by_name_ascending() {
     assert!(ui_state.sort_ascending);
 }
 
-// Test AC1: Visual indicators for sort
 #[test]
 fn test_sort_visual_indicators() {
     let ui_state = UIContainerState::new();
@@ -39,7 +37,6 @@ fn test_sort_visual_indicators() {
     }
 }
 
-// Test AC2: Command confirmation modal state
 #[test]
 fn test_confirmation_modal_state() {
     let gui_state = create_test_gui_state();
@@ -58,7 +55,6 @@ fn test_confirmation_modal_state() {
     assert!(gui_state.lock().unwrap().get_command_confirm().is_none());
 }
 
-// Test AC3: Logs panel title formatting
 #[test]
 fn test_logs_panel_title_format() {
     let mut ui_state = UIContainerState::new();
@@ -105,7 +101,6 @@ fn test_logs_panel_title_format() {
     assert!(view_model.log_view.title.contains("nginx:latest"));
 }
 
-// Test AC4: Default log selection at bottom
 #[test]
 fn test_default_log_position_at_bottom() {
     let gui_state = create_test_gui_state();
@@ -113,7 +108,7 @@ fn test_default_log_position_at_bottom() {
     
     // Add logs
     for i in 0..10 {
-        ui_state.logs.push_back(format!("Log entry {}", i));
+        ui_state.logs.push_back(format!("Log entry {i}"));
     }
     
     // When logs are added, position should be at bottom
@@ -123,7 +118,6 @@ fn test_default_log_position_at_bottom() {
     assert_eq!(position, 9); // Last index for 10 logs
 }
 
-// Test AC5: Column spacing consistency
 #[test]
 fn test_container_column_spacing() {
     let ui_state = UIContainerState::new();
@@ -149,7 +143,6 @@ fn test_container_column_spacing() {
     }
 }
 
-// Test AC6: Search mode activation
 #[test]
 fn test_search_mode_activation() {
     let gui_state = create_test_gui_state();
@@ -165,7 +158,6 @@ fn test_search_mode_activation() {
     assert!(!gui_state.lock().unwrap().get_status().contains(&Status::Filter));
 }
 
-// Test AC7: Filter visual feedback
 #[test]
 fn test_filter_visual_feedback() {
     let mut ui_state = UIContainerState::new();
@@ -186,7 +178,6 @@ fn test_filter_visual_feedback() {
     assert_eq!(view_model.filter_term.unwrap(), "nginx");
 }
 
-// Integration test: Sort state persistence across updates
 #[test]
 fn test_sort_state_persistence() {
     let mut ui_state = UIContainerState::new();
@@ -222,7 +213,6 @@ fn test_sort_state_persistence() {
     assert!(!ui_state.sort_ascending);
 }
 
-// Integration test: Confirmation modal flow
 #[test]
 fn test_confirmation_modal_flow() {
     let gui_state = create_test_gui_state();
@@ -248,7 +238,6 @@ fn test_confirmation_modal_flow() {
     assert!(gui_state.lock().unwrap().get_command_confirm().is_none());
 }
 
-// UI test: Visual indicators rendering
 #[test]
 fn test_visual_indicators_in_view_model() {
     let mut ui_state = UIContainerState::new();
@@ -275,7 +264,6 @@ fn test_visual_indicators_in_view_model() {
     assert!(view_model.status.contains(&Status::Filter));
 }
 
-// Test sticky bottom behavior for logs
 #[test]
 fn test_logs_sticky_bottom_behavior() {
     let gui_state = create_test_gui_state();
@@ -283,7 +271,7 @@ fn test_logs_sticky_bottom_behavior() {
     
     // Add initial logs
     for i in 0..5 {
-        ui_state.logs.push_back(format!("Log {}", i));
+        ui_state.logs.push_back(format!("Log {i}"));
     }
     
     // Position at bottom
@@ -291,7 +279,7 @@ fn test_logs_sticky_bottom_behavior() {
     
     // Add more logs
     for i in 5..10 {
-        ui_state.logs.push_back(format!("Log {}", i));
+        ui_state.logs.push_back(format!("Log {i}"));
     }
     
     // If we were at bottom, we should stay at bottom (sticky)
@@ -302,7 +290,6 @@ fn test_logs_sticky_bottom_behavior() {
     assert_eq!(gui_state.lock().unwrap().get_ui_logs_position(), 9);
 }
 
-// Test filter field changes
 #[test]
 fn test_filter_field_navigation() {
     let mut ui_state = UIContainerState::new();

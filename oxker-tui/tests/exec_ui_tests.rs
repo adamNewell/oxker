@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use oxker_core::{KeyCode, Keymap, app_data::ContainerId};
 use oxker_tui::{
     handlers::UIContainerState,
@@ -22,7 +24,7 @@ fn test_exec_container_id_management() {
     // Verify it's set
     assert_eq!(
         gui_state.get_exec_container_id(),
-        Some(container_id.clone())
+        Some(container_id)
     );
 
     // Clear it by removing Exec status
@@ -32,7 +34,6 @@ fn test_exec_container_id_management() {
 
 #[test]
 fn test_exec_status_lifecycle() {
-    // Test the Status::Exec lifecycle
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -56,7 +57,6 @@ fn test_exec_status_lifecycle() {
 
 #[test]
 fn test_keymap_exec_key_mapping() {
-    // Test that exec key is properly mapped in keymap
     let keymap = Keymap::default();
 
     // Default exec key should be 'e'
@@ -75,12 +75,14 @@ async fn test_exec_with_selected_container() {
     {
         let mut ui_state = container_state.lock();
         ui_state.selected_container_id = Some(ContainerId::from("container1"));
+        drop(ui_state);
     }
 
     // Verify container is selected
     {
         let ui_state = container_state.lock();
         assert!(ui_state.selected_container_id.is_some());
+        drop(ui_state);
     }
 
     // When exec is triggered, GUI state should be updated
@@ -89,6 +91,7 @@ async fn test_exec_with_selected_container() {
         let mut gui = gui_state.lock();
         gui.set_exec_container_id(Some(container_id.clone()));
         gui.status_push(Status::Exec);
+        drop(gui);
     }
 
     // Verify state after exec trigger
@@ -96,12 +99,12 @@ async fn test_exec_with_selected_container() {
         let gui = gui_state.lock();
         assert_eq!(gui.get_exec_container_id(), Some(container_id));
         assert!(gui.get_status().contains(&Status::Exec));
+        drop(gui);
     }
 }
 
 #[test]
 fn test_exec_without_selected_container() {
-    // Test exec behavior when no container is selected
     let rerender = Arc::new(Rerender::new());
     let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, false)));
     let container_state = Arc::new(Mutex::new(UIContainerState::new()));
@@ -110,6 +113,7 @@ fn test_exec_without_selected_container() {
     {
         let ui_state = container_state.lock();
         assert_eq!(ui_state.selected_container_id, None);
+        drop(ui_state);
     }
 
     // Exec should not set container ID or status when no container is selected
@@ -117,12 +121,12 @@ fn test_exec_without_selected_container() {
         let gui = gui_state.lock();
         assert_eq!(gui.get_exec_container_id(), None);
         assert!(!gui.get_status().contains(&Status::Exec));
+        drop(gui);
     }
 }
 
 #[test]
 fn test_exec_prevents_other_inputs() {
-    // Test that Exec status prevents processing other inputs
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -139,7 +143,6 @@ fn test_exec_prevents_other_inputs() {
 
 #[test]
 fn test_exec_terminal_transition() {
-    // Test the terminal state transition for exec
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
     let container_id = ContainerId::from("test_container");
@@ -160,7 +163,6 @@ fn test_exec_terminal_transition() {
 
 #[test]
 fn test_exec_with_multiple_statuses() {
-    // Test exec behavior with multiple active statuses
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -186,7 +188,6 @@ fn test_exec_with_multiple_statuses() {
 
 #[test]
 fn test_selected_panel_during_exec() {
-    // Test panel selection behavior during exec
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -202,7 +203,6 @@ fn test_selected_panel_during_exec() {
 
 #[test]
 fn test_info_box_on_no_container() {
-    // Test that info box is shown when no container is selected
     let rerender = Arc::new(Rerender::new());
     let mut gui_state = GuiState::new(&rerender, false);
 
@@ -245,6 +245,7 @@ mod integration_tests {
             let gui = gui_state.lock();
             assert_eq!(gui.get_exec_container_id(), Some(container_id));
             assert!(gui.get_status().contains(&Status::Exec));
+            drop(gui);
         }
 
         // Simulate exec completion
@@ -258,6 +259,7 @@ mod integration_tests {
             let gui = gui_state.lock();
             assert_eq!(gui.get_exec_container_id(), None);
             assert!(!gui.get_status().contains(&Status::Exec));
+            drop(gui);
         }
     }
 }

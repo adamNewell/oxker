@@ -28,7 +28,6 @@ impl UIEventHandler {
         }
     }
 
-    /// Get a reference to the container state for UI components
     #[must_use]
     pub fn get_container_state(&self) -> Arc<Mutex<UIContainerState>> {
         Arc::clone(&self.container_state)
@@ -147,8 +146,10 @@ impl UIEventHandler {
         let (previous_log_count, was_at_bottom) = {
             let container_state = self.container_state.lock();
             let prev_count = container_state.logs.len();
+            drop(container_state);
             let gui_state = self.gui_state.lock();
             let current_position = gui_state.get_ui_logs_position();
+            drop(gui_state);
             // User is at bottom if they're viewing the last log (or there were no logs)
             let at_bottom = prev_count == 0 || current_position >= prev_count.saturating_sub(1);
             (prev_count, at_bottom)

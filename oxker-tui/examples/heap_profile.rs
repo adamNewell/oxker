@@ -1,3 +1,5 @@
+#![allow(clippy::significant_drop_tightening)]
+
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
@@ -52,8 +54,8 @@ fn main() {
     // Create UI state with 50 containers
     let ui_state = Arc::new(Mutex::new(UIContainerState::new()));
 
-    let containers: Vec<ContainerItem> = (0..50)
-        .map(|i| create_test_container(i as u64, &format!("container_{i}")))
+    let containers: Vec<ContainerItem> = (0..50u64)
+        .map(|i| create_test_container(i, &format!("container_{i}")))
         .collect();
 
     {

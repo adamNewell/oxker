@@ -175,16 +175,16 @@ mod tests {
         let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, true)));
         let container_state = Arc::new(Mutex::new(UIContainerState::default()));
         let theme = AppColors::new();
-        let mut fd = FrameViewModel::default();
-
-        // Add some test commands
-        fd.commands_view = CommandsView {
-            commands: vec![
-                DockerCommand::Pause,
-                DockerCommand::Resume,
-                DockerCommand::Stop,
-                DockerCommand::Restart,
-            ],
+        let fd = FrameViewModel {
+            commands_view: CommandsView {
+                commands: vec![
+                    DockerCommand::Pause,
+                    DockerCommand::Resume,
+                    DockerCommand::Stop,
+                    DockerCommand::Restart,
+                ],
+            },
+            ..Default::default()
         };
 
         let props = CommandsPanelProps {

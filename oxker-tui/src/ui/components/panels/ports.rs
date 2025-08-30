@@ -26,7 +26,6 @@ impl PortsPanel {
         Self {}
     }
 
-    /// Get the port title color based on container state
     const fn get_port_title_color(colors: &AppColors, state: State) -> CoreColor {
         if state.is_alive() {
             colors.chart_ports.title
@@ -132,14 +131,16 @@ mod tests {
     fn test_ports_panel_no_ports() {
         let panel = PortsPanel::new();
         let theme = AppColors::new();
-        let mut fd = FrameViewModel::default();
 
         // Set up port view with no ports
-        fd.port_view = Some(PortView {
-            ports: vec![],
-            max_lens: (2, 7, 7), // Default minimum lengths
-            state: State::Running(oxker_core::RunningState::Healthy),
-        });
+        let fd = FrameViewModel {
+            port_view: Some(PortView {
+                ports: vec![],
+                max_lens: (2, 7, 7), // Default minimum lengths
+                state: State::Running(oxker_core::RunningState::Healthy),
+            }),
+            ..Default::default()
+        };
 
         let props = PortsPanelProps {
             view_model: &fd,
@@ -165,25 +166,27 @@ mod tests {
     fn test_ports_panel_with_ports() {
         let panel = PortsPanel::new();
         let theme = AppColors::new();
-        let mut fd = FrameViewModel::default();
 
         // Set up port view with some ports
-        fd.port_view = Some(PortView {
-            ports: vec![
-                ContainerPorts {
-                    ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
-                    private: 80,
-                    public: Some(8080),
-                },
-                ContainerPorts {
-                    ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
-                    private: 443,
-                    public: Some(8443),
-                },
-            ],
-            max_lens: (7, 7, 7), // Lengths for formatting
-            state: State::Running(oxker_core::RunningState::Healthy),
-        });
+        let fd = FrameViewModel {
+            port_view: Some(PortView {
+                ports: vec![
+                    ContainerPorts {
+                        ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                        private: 80,
+                        public: Some(8080),
+                    },
+                    ContainerPorts {
+                        ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                        private: 443,
+                        public: Some(8443),
+                    },
+                ],
+                max_lens: (7, 7, 7), // Lengths for formatting
+                state: State::Running(oxker_core::RunningState::Healthy),
+            }),
+            ..Default::default()
+        };
 
         let props = PortsPanelProps {
             view_model: &fd,
@@ -209,14 +212,16 @@ mod tests {
     fn test_ports_panel_dead_container() {
         let panel = PortsPanel::new();
         let theme = AppColors::new();
-        let mut fd = FrameViewModel::default();
 
         // Set up port view with dead state
-        fd.port_view = Some(PortView {
-            ports: vec![],
-            max_lens: (2, 7, 7),
-            state: State::Dead,
-        });
+        let fd = FrameViewModel {
+            port_view: Some(PortView {
+                ports: vec![],
+                max_lens: (2, 7, 7),
+                state: State::Dead,
+            }),
+            ..Default::default()
+        };
 
         let props = PortsPanelProps {
             view_model: &fd,

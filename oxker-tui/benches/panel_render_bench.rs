@@ -1,4 +1,6 @@
 #![allow(clippy::unwrap_used)]
+#![allow(clippy::significant_drop_tightening)]
+#![allow(clippy::cast_precision_loss)]
 
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use jiff::tz::TimeZone;
@@ -74,6 +76,7 @@ fn create_ui_state_with_containers(num_containers: usize) -> Arc<Mutex<UIContain
                 .logs
                 .push_back(format!("Log line {i} with some content"));
         }
+        drop(state);
     }
 
     ui_state
@@ -145,6 +148,7 @@ fn benchmark_logs_panel_render(c: &mut Criterion) {
                             "Log line {i} with some content that might be longer than usual"
                         ));
                     }
+                    drop(state);
                 }
                 let gui_state = create_gui_state();
                 let colors = AppColors::new();
@@ -450,7 +454,6 @@ fn benchmark_full_ui_render(c: &mut Criterion) {
                     timezone: Some(jiff::tz::TimeZone::UTC),
                     timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
                     show_logs: true,
-                    use_cli: false,
                 };
                 let mut terminal = create_test_terminal();
 

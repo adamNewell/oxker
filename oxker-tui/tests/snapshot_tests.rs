@@ -1,4 +1,5 @@
 //! Snapshot tests for UI components to ensure no visual regression
+#![allow(clippy::unwrap_used)]
 
 use insta::assert_snapshot;
 use oxker_core::{AppColors, FilterBy, Keymap};
@@ -117,7 +118,7 @@ fn test_full_ui_snapshot() {
             let filter_props = FilterPanelProps {
                 filter_by: FilterBy::Name,
                 filter_term: Some("test".to_string()),
-                theme: theme.clone(),
+                theme,
             };
             filter_panel.render(&filter_props, chunks[0], f);
 

@@ -86,7 +86,7 @@ mod mock_tests {
         // The expected command structure
         let container_id = ContainerId::from("test_container");
         let expected_program = "docker";
-        let expected_args = vec!["exec", "-it", "test_container", "sh"];
+        let expected_args = ["exec", "-it", "test_container", "sh"];
 
         // In the actual implementation, this command would be:
         // docker exec -it test_container sh

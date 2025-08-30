@@ -58,7 +58,6 @@ impl ConfirmationModal {
         Self {}
     }
 
-    /// Format key binding text for buttons
     fn format_key_text(key: oxker_core::KeyCode) -> String {
         use oxker_core::KeyCode;
 
@@ -70,8 +69,7 @@ impl ConfirmationModal {
         }
     }
 
-    /// Get the title for the modal based on the command
-    fn get_title(command: DockerCommand) -> &'static str {
+    const fn get_title(command: DockerCommand) -> &'static str {
         match command {
             DockerCommand::Stop => " Confirm Stop ",
             DockerCommand::Restart => " Confirm Restart ",
@@ -82,19 +80,17 @@ impl ConfirmationModal {
         }
     }
 
-    /// Get the confirmation text for the command
     fn get_confirm_text(command: DockerCommand, container_name: &str) -> String {
         match command {
-            DockerCommand::Stop => format!("Stop container: {}", container_name),
-            DockerCommand::Restart => format!("Restart container: {}", container_name),
-            DockerCommand::Pause => format!("Pause container: {}", container_name),
-            DockerCommand::Resume => format!("Resume container: {}", container_name),
-            DockerCommand::Start => format!("Start container: {}", container_name),
-            DockerCommand::Delete => format!("Delete container: {}", container_name),
+            DockerCommand::Stop => format!("Stop container: {container_name}"),
+            DockerCommand::Restart => format!("Restart container: {container_name}"),
+            DockerCommand::Pause => format!("Pause container: {container_name}"),
+            DockerCommand::Resume => format!("Resume container: {container_name}"),
+            DockerCommand::Start => format!("Start container: {container_name}"),
+            DockerCommand::Delete => format!("Delete container: {container_name}"),
         }
     }
 
-    /// Calculate the required size for the dialog
     fn calculate_size(command: DockerCommand, container_name: &str) -> (u16, u16) {
         let confirm_text = Self::get_confirm_text(command, container_name);
         let width = u16::try_from(confirm_text.len())
@@ -120,21 +116,12 @@ impl<'p> Component<'p> for ConfirmationModal {
             Rect::new(x, y, width, height)
         };
 
-        // Use appropriate colors based on command severity
-        let (bg_color, text_color, highlight_color) = if props.command == DockerCommand::Delete {
-            (
-                props.theme.popup_delete.background,
-                props.theme.popup_delete.text,
-                props.theme.popup_delete.text_highlight,
-            )
-        } else {
-            // Use standard popup colors for other commands
-            (
-                props.theme.popup_delete.background,
-                props.theme.popup_delete.text,
-                props.theme.popup_delete.text_highlight,
-            )
-        };
+        // Use appropriate colors for the confirmation modal
+        let (bg_color, text_color, highlight_color) = (
+            props.theme.popup_delete.background,
+            props.theme.popup_delete.text,
+            props.theme.popup_delete.text_highlight,
+        );
 
         // Create the main block
         let block = Block::default()
@@ -177,7 +164,6 @@ impl<'p> Component<'p> for ConfirmationModal {
             Self::format_key_text(oxker_core::KeyCode::Char('q'))
         );
 
-        // Create button blocks
         let button_block = || {
             Block::default()
                 .border_type(BorderType::Rounded)
@@ -193,7 +179,6 @@ impl<'p> Component<'p> for ConfirmationModal {
             .alignment(Alignment::Center)
             .block(button_block());
 
-        // Layout the dialog
         let split_popup = Layout::default()
             .direction(Direction::Vertical)
             .constraints(CONSTRAINT_POPUP)
@@ -207,14 +192,12 @@ impl<'p> Component<'p> for ConfirmationModal {
         let cancel_area = split_buttons[1];
         let confirm_area = split_buttons[3];
 
-        // Render the widgets
         frame.render_widget(Clear, dialog_area);
         frame.render_widget(block, dialog_area);
         frame.render_widget(confirm_text_para, split_popup[1]);
         frame.render_widget(cancel_para, cancel_area);
         frame.render_widget(confirm_button_para, confirm_area);
 
-        // Update region map for button interaction
         props
             .gui_state
             .lock()

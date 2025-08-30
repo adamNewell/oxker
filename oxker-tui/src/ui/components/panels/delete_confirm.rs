@@ -258,6 +258,8 @@ mod tests {
 
     #[test]
     fn test_delete_confirm_panel_custom_keymap() {
+        use oxker_core::KeyCode;
+
         let panel = DeleteConfirmPanel::new();
         let rerender = Arc::new(crate::ui::Rerender::default());
         let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, true)));
@@ -265,7 +267,6 @@ mod tests {
         let mut keymap = Keymap::new();
 
         // Customize keybindings
-        use oxker_core::KeyCode;
         keymap.delete_confirm = (KeyCode::Enter, None);
         keymap.delete_deny = (KeyCode::Esc, None);
 

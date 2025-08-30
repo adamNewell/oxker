@@ -257,6 +257,8 @@ mod tests {
 
     #[test]
     fn test_containers_panel_with_containers() {
+        use oxker_core::{ByteStats, ContainerId, CpuStats, State};
+
         let panel = ContainersPanel::new();
         let rerender = Arc::new(crate::ui::Rerender::default());
         let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, true)));
@@ -265,7 +267,6 @@ mod tests {
         let mut fd = FrameViewModel::default();
 
         // Add a test container
-        use oxker_core::{ByteStats, ContainerId, CpuStats, State};
         fd.containers.push(ContainerView {
             name: "test-container".to_string(),
             state: State::Running(oxker_core::RunningState::Healthy),
