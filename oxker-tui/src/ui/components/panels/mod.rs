@@ -2,6 +2,7 @@
 
 pub mod charts;
 pub mod commands;
+pub mod confirmation_modal;
 pub mod containers;
 pub mod delete_confirm;
 pub mod error;
@@ -15,6 +16,7 @@ pub mod ports;
 // Re-export panel components
 pub use charts::ChartsPanel;
 pub use commands::CommandsPanel;
+pub use confirmation_modal::{ConfirmationModal, ConfirmationButton};
 pub use containers::ContainersPanel;
 pub use delete_confirm::DeleteConfirmPanel;
 pub use error::ErrorPanel;

@@ -8,9 +8,10 @@ use std::{
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
-use oxker_core::{ContainerId, Header};
+use oxker_core::{ContainerId, DockerCommand, Header};
 
 use super::Rerender;
+use super::components::panels::ConfirmationButton;
 
 #[derive(Debug, Default, Clone, Copy, Eq, Hash, PartialEq)]
 pub enum SelectablePanel {
@@ -53,6 +54,7 @@ pub enum Region {
     Header(Header),
     HelpPanel,
     Delete(DeleteButton),
+    ConfirmationModal(ConfirmationButton),
 }
 
 #[derive(Debug, Clone, Copy, Eq, Hash, PartialEq)]
@@ -69,6 +71,7 @@ const FRAMES_LEN: u8 = 9;
 /// Various functions (e.g input handler), operate differently depending upon current Status
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
 pub enum Status {
+    CommandConfirm,
     DeleteConfirm,
     DockerConnect,
     Error,
@@ -82,8 +85,10 @@ pub enum Status {
 /// Global gui_state, stored in an Arc<Mutex>
 #[derive(Debug)]
 pub struct GuiState {
+    command_confirm: Option<(DockerCommand, ContainerId)>,
     delete_container_id: Option<ContainerId>,
     exec_container_id: Option<ContainerId>,
+    intersect_confirm: HashMap<ConfirmationButton, Rect>,
     intersect_delete: HashMap<DeleteButton, Rect>,
     intersect_heading: HashMap<Header, Rect>,
     intersect_help: Option<Rect>,
@@ -105,9 +110,11 @@ pub struct GuiState {
 impl GuiState {
     pub fn new(redraw: &Arc<Rerender>, show_logs: bool) -> Self {
         Self {
+            command_confirm: None,
             delete_container_id: None,
             exec_container_id: None,
             info_box_text: None,
+            intersect_confirm: HashMap::new(),
             intersect_delete: HashMap::new(),
             intersect_heading: HashMap::new(),
             intersect_help: None,
@@ -263,6 +270,12 @@ impl GuiState {
                     .and_modify(|w| *w = area)
                     .or_insert(area);
             }
+            Region::ConfirmationModal(button) => {
+                self.intersect_confirm
+                    .entry(button)
+                    .and_modify(|w| *w = area)
+                    .or_insert(area);
+            }
             Region::HelpPanel => {
                 self.intersect_help = Some(area);
             }
@@ -288,6 +301,24 @@ impl GuiState {
         self.rerender.update_draw();
     }
 
+    /// Get the command confirmation state
+    #[must_use]
+    pub fn get_command_confirm(&self) -> Option<(DockerCommand, ContainerId)> {
+        self.command_confirm.clone()
+    }
+
+    /// Set the command confirmation state
+    pub fn set_command_confirm(&mut self, confirm: Option<(DockerCommand, ContainerId)>) {
+        if confirm.is_some() {
+            self.status.insert(Status::CommandConfirm);
+        } else {
+            self.intersect_confirm.clear();
+            self.status_del(Status::CommandConfirm);
+        }
+        self.command_confirm = confirm;
+        self.rerender.update_draw();
+    }
+
     /// Return a copy of the Status HashSet
     #[must_use]
     pub fn get_status(&self) -> HashSet<Status> {
@@ -299,6 +330,10 @@ impl GuiState {
     pub fn status_del(&mut self, status: Status) {
         self.status.remove(&status);
         match status {
+            Status::CommandConfirm => {
+                self.command_confirm = None;
+                self.intersect_confirm.clear();
+            }
             Status::DeleteConfirm => {
                 self.status.remove(&Status::DeleteConfirm);
             }

@@ -124,6 +124,17 @@ async fn main() {
             error!("Failed to refresh containers on startup: {}", e);
         }
 
+        // Apply default sort (Name ascending) after containers are loaded
+        if let Err(e) = core_handle
+            .execute_command(oxker_core::CoreCommand::SortContainers(
+                oxker_core::events::types::SortField::Name,
+                oxker_core::events::types::SortOrder::Ascending,
+            ))
+            .await
+        {
+            error!("Failed to apply default sort on startup: {}", e);
+        }
+
         // Wait a bit for initial container selection
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 

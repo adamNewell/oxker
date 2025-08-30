@@ -139,18 +139,19 @@ impl HelpPanel {
                 button("h"),
                 desc("toggle this help information - or click heading"),
             ]),
-            Line::from(vec![space(), button("s"), desc("save logs to file")]),
+            Line::from(vec![
+                space(),
+                button("s"),
+                or(),
+                button("/"),
+                or(),
+                button("F1"),
+                desc("search/filter containers"),
+            ]),
             Line::from(vec![
                 space(),
                 button("m"),
                 desc("toggle mouse capture - if disabled, text on screen can be selected & copied"),
-            ]),
-            Line::from(vec![
-                space(),
-                button("F1"),
-                or(),
-                button("/"),
-                desc("enter filter mode"),
             ]),
             Line::from(vec![space(), button("0"), desc("stop sort")]),
             Line::from(vec![

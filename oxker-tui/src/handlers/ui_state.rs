@@ -50,9 +50,9 @@ impl UIContainerState {
             ]),
             logs: VecDeque::new(),
             filter_term: String::new(),
-            filter_by: Header::Name,
-            sort_header: None, // Start unsorted
-            sort_ascending: true,
+            filter_by: Header::Id, // Using Id to represent "All" - default filter
+            sort_header: Some(Header::Name), // Default sort by name
+            sort_ascending: true, // Default to ascending order (should show ▲)
             version: 0,
             last_significant_change: 0,
         }
@@ -429,21 +429,21 @@ impl UIContainerState {
 
     pub const fn next_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
-            Header::Name => Header::Image,
-            Header::Image => Header::State,
-            Header::State => Header::Status,
-            Header::Status => Header::Id,
-            _ => Header::Name,
+            Header::Id => Header::Name,      // All -> Name
+            Header::Name => Header::Image,    // Name -> Image
+            Header::Image => Header::Status,  // Image -> Status
+            Header::Status => Header::Id,     // Status -> All (wrap around)
+            _ => Header::Id,                  // Default to All
         };
     }
 
     pub const fn prev_filter_field(&mut self) {
         self.filter_by = match self.filter_by {
-            Header::Name => Header::Id,
-            Header::State => Header::Image,
-            Header::Status => Header::State,
-            Header::Id => Header::Status,
-            _ => Header::Name,
+            Header::Id => Header::Status,     // All -> Status (wrap around)
+            Header::Name => Header::Id,       // Name -> All
+            Header::Image => Header::Name,    // Image -> Name
+            Header::Status => Header::Image,  // Status -> Image
+            _ => Header::Id,                  // Default to All
         };
     }
 }

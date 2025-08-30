@@ -48,11 +48,14 @@ impl LogsPanel {
             (props.theme.borders.unselected, props.theme.filter.text)
         };
 
+        // Generate title with log position and container info
+        let title = Self::generate_title(props);
+
         let mut block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(block_color.into_ratatui_color()))
             .title(Span::styled(
-                " Logs ",
+                title,
                 Style::default()
                     .fg(highlight_color.into_ratatui_color())
                     .add_modifier(Modifier::BOLD),
@@ -64,6 +67,37 @@ impl LogsPanel {
         }
 
         block
+    }
+
+    /// Generate the title with log position and container info
+    fn generate_title(props: &LogsPanelProps) -> String {
+        let total_logs = props.view_model.log_view.logs.len();
+        let current_position = if total_logs > 0 {
+            props.gui_state.lock().get_ui_logs_position() + 1
+        } else {
+            0
+        };
+        
+        // Use the pre-computed title from LogView which has container name and image
+        let container_info = &props.view_model.log_view.title;
+        
+        if container_info.is_empty() {
+            format!(" Logs {}/{} ", current_position, total_logs)
+        } else {
+            // Extract container name and image from the existing title
+            // Current format is "Logs - container_name - image_name"
+            let parts: Vec<&str> = container_info.splitn(3, " - ").collect();
+            if parts.len() >= 3 {
+                format!(" Logs {}/{} - {} - {} ", 
+                    current_position, 
+                    total_logs,
+                    parts[1], // container name
+                    parts[2]  // image name
+                )
+            } else {
+                format!(" Logs {}/{} - {} ", current_position, total_logs, container_info)
+            }
+        }
     }
 }
 

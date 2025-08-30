@@ -2,11 +2,11 @@
 source: oxker-tui/tests/comprehensive_snapshot_tests.rs
 expression: output
 ---
- Esc  clear  ← by →   Name  Image  Status  All  term: web                                                               
-                                                                                                        ( h ) show help 
+ Esc  clear  ← by →   All  Name  Image  Status  term: web                                                               
+                                                                                                       ( h ) show help  
                                                                                                                         
 ┌ Containers ──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│nginx-web ✓ running Up 1 hour 25.50% 0.00 kB / 1.07 GB   abc123 test_image:latest 0.00 kB 0.00 kB                     │
+│nginx-web  ✓ running  Up 1 hour  25.50%  0.00 kB / 1.07 GB    abc123  test_image:latest  0.00 kB  0.00 kB             │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
@@ -25,7 +25,7 @@ expression: output
 │      │                                                   ││         │                                                │
 │      │                                                   ││         │                                                │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
-┌ Logs ────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+┌ Logs 1/3 - Container Logs ───────────────────────────────────────────────────────────────────────────────────────────┐
 │→ [10:00:00] Starting application...                                                                                  │
 │  [10:00:01] Server listening on port 80                                                                              │
 │  [10:00:02] Ready to accept connections                                                                              │

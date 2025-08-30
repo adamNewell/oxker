@@ -5,7 +5,7 @@ use tokio::sync::mpsc::{Sender, channel};
 use tracing::{debug, error, info};
 
 use crate::{
-    app_data::{AppData, ContainerId, DockerCommand, Header},
+    app_data::{AppData, ContainerId, DockerCommand, FilterBy, Header},
     config::{Config, Keymap},
     docker_data::{DockerData, DockerMessage},
     events::{CoreCommand, CoreEvent, EventBus},
@@ -190,16 +190,38 @@ impl CoreHandle {
         Ok(())
     }
 
-    async fn handle_filter_containers(&self) -> Result<(), String> {
-        // For now, just trigger a container update
-        self.docker_tx
-            .send(DockerMessage::Update)
-            .await
-            .map_err(|e| format!("Failed to send update message: {e}"))?;
-
-        // Get filtered containers
+    async fn handle_filter_containers(
+        &self,
+        filter_text: &str,
+        filter_field: crate::events::types::FilterField,
+    ) -> Result<(), String> {
+        use crate::events::types::FilterField;
+        
+        // Update filter in AppData and get filtered containers
         let event_containers = {
-            let app_data = self.app_data.lock();
+            let mut app_data = self.app_data.lock();
+            
+            // Set or clear the filter
+            if filter_text.is_empty() {
+                app_data.set_filter_term(None);
+            } else {
+                app_data.set_filter_term(Some(filter_text.to_lowercase()));
+            }
+            
+            // Map FilterField to FilterBy
+            let filter_by = match filter_field {
+                FilterField::Name => FilterBy::Name,
+                FilterField::Image => FilterBy::Image,
+                FilterField::Status => FilterBy::Status,
+                FilterField::All => FilterBy::All,
+            };
+            app_data.set_filter_by(filter_by);
+            
+            // Apply the filter and sort, then get resulting items
+            app_data.filter_containers();
+            // Sort containers if a sort is configured (AppData defaults to Name ascending)
+            app_data.sort_containers();
+            
             Self::convert_to_event_containers(app_data.get_container_items())
         }; // Drop lock before await
 
@@ -211,8 +233,10 @@ impl CoreHandle {
     async fn handle_sort_containers(
         &self,
         sort_field: crate::events::types::SortField,
+        sort_order: crate::events::types::SortOrder,
     ) -> Result<(), String> {
-        use crate::events::types::SortField;
+        use crate::events::types::{SortField, SortOrder};
+        use crate::app_data::SortedOrder;
 
         // Map SortField to Header
         let header = match sort_field {
@@ -227,10 +251,16 @@ impl CoreHandle {
             SortField::NetworkTx => Header::Tx,
         };
 
+        // Map SortOrder to SortedOrder
+        let sorted_order = match sort_order {
+            SortOrder::Ascending => SortedOrder::Asc,
+            SortOrder::Descending => SortedOrder::Desc,
+        };
+
         // Sort containers and get the result
         let event_containers = {
             let mut app_data = self.app_data.lock();
-            app_data.set_sort_by_header(header);
+            app_data.set_sorted(Some((header, sorted_order)));
             app_data.sort_containers();
 
             // Get sorted containers
@@ -326,12 +356,11 @@ impl CoreHandle {
                 self.send_control_command(DockerCommand::Restart, container_id)
                     .await?;
             }
-            CoreCommand::FilterContainers(_filter_text) => {
-                // TODO: Implement filter update when AppData provides public API
-                self.handle_filter_containers().await?;
+            CoreCommand::FilterContainers(filter_text, filter_field) => {
+                self.handle_filter_containers(&filter_text, filter_field).await?;
             }
-            CoreCommand::SortContainers(sort_field, _sort_order) => {
-                self.handle_sort_containers(sort_field).await?;
+            CoreCommand::SortContainers(sort_field, sort_order) => {
+                self.handle_sort_containers(sort_field, sort_order).await?;
             }
             CoreCommand::UnpauseContainer(container_id) => {
                 self.send_control_command(DockerCommand::Resume, container_id)

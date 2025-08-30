@@ -143,16 +143,35 @@ impl UIEventHandler {
             container_id
         );
 
+        // Check if we should auto-scroll to bottom
+        let (previous_log_count, was_at_bottom) = {
+            let container_state = self.container_state.lock();
+            let prev_count = container_state.logs.len();
+            let gui_state = self.gui_state.lock();
+            let current_position = gui_state.get_ui_logs_position();
+            // User is at bottom if they're viewing the last log (or there were no logs)
+            let at_bottom = prev_count == 0 || current_position >= prev_count.saturating_sub(1);
+            (prev_count, at_bottom)
+        };
+
         // Update container logs
-        {
+        let new_log_count = {
             let mut container_state = self.container_state.lock();
             container_state.add_logs(container_id, logs);
-        }
+            container_state.logs.len()
+        };
 
-        // Clear logs loading state if active
+        // Update UI state
         {
             let mut gui_state = self.gui_state.lock();
             gui_state.status_del(Status::Logs);
+            
+            // Only auto-scroll to bottom if:
+            // 1. This is the first set of logs (previous_log_count == 0), OR
+            // 2. User was already at the bottom (sticky bottom behavior)
+            if new_log_count > 0 && (previous_log_count == 0 || was_at_bottom) {
+                gui_state.set_ui_logs_position(new_log_count - 1);
+            }
         }
 
         // Trigger UI rerender

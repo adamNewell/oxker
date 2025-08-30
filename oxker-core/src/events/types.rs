@@ -69,8 +69,16 @@ pub enum CoreCommand {
     PauseContainer(String),
     UnpauseContainer(String),
     RestartContainer(String),
-    FilterContainers(String),
+    FilterContainers(String, FilterField),
     SortContainers(SortField, SortOrder),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum FilterField {
+    Name,
+    Image,
+    Status,
+    All,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

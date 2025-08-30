@@ -5,7 +5,7 @@ use crate::ui::{
     components::{
         Component,
         panels::{
-            ChartsPanel, CommandsPanel, ContainersPanel, DeleteConfirmPanel, ErrorPanel,
+            ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DeleteConfirmPanel, ErrorPanel,
             FilterPanel, HeadersPanel, HelpPanel, LogsPanel, PortsPanel,
         },
         widgets::InfoBox,
@@ -29,6 +29,7 @@ pub struct MainView<'a> {
     ports: PortsPanel,
     filter: FilterPanel,
     delete_confirm: DeleteConfirmPanel,
+    confirmation_modal: ConfirmationModal,
     error: ErrorPanel,
     help: HelpPanel,
     info_box: InfoBox,
@@ -56,6 +57,7 @@ impl<'a> MainView<'a> {
             ports: PortsPanel::new(),
             filter: FilterPanel::new(),
             delete_confirm: DeleteConfirmPanel::new(),
+            confirmation_modal: ConfirmationModal::new(),
             error: ErrorPanel::new(),
             help: HelpPanel::new(),
             info_box: InfoBox::new(),
@@ -272,6 +274,35 @@ impl super::View for MainView<'_> {
             } else {
                 // Container was deleted externally, clear the dialog
                 self.gui_state.lock().set_delete_container(None);
+            }
+        }
+
+        // Command confirmation dialog
+        if model.status.contains(&Status::CommandConfirm) {
+            if let Some((command, container_id)) = self.gui_state.lock().get_command_confirm() {
+                // Find container name from UIContainerState
+                let container_name = self
+                    .container_state
+                    .lock()
+                    .get_container_items()
+                    .iter()
+                    .find(|c| c.id == container_id)
+                    .map(|c| c.name.clone());
+
+                if let Some(name) = container_name {
+                    let confirm_props = crate::ui::components::panels::confirmation_modal::ConfirmationModalProps {
+                        command,
+                        container_id: container_id.get(),
+                        container_name: name.get(),
+                        theme,
+                        keymap: self.keymap,
+                        gui_state: self.gui_state,
+                    };
+                    self.confirmation_modal.render(&confirm_props, frame.area(), frame);
+                } else {
+                    // Container was deleted externally, clear the dialog
+                    self.gui_state.lock().set_command_confirm(None);
+                }
             }
         }
 

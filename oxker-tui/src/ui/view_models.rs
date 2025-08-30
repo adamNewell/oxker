@@ -199,7 +199,12 @@ impl FrameViewModel {
                 ui_state.containers.state.selected(),
             ),
             delete_confirm: gui_state.get_delete_container(),
-            filter_by: FilterBy::Name, // Convert from ui_state.filter_by
+            filter_by: match ui_state.filter_by {
+                Header::Name => FilterBy::Name,
+                Header::Image => FilterBy::Image,
+                Header::Status | Header::State => FilterBy::Status, // Map State to Status for filtering
+                _ => FilterBy::All, // Default to searching all fields for other headers (Id, CPU, Memory, etc.)
+            },
             filter_term: if ui_state.filter_term.is_empty() {
                 None
             } else {

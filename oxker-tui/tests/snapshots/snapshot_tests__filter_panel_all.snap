@@ -2,4 +2,4 @@
 source: oxker-tui/tests/snapshot_tests.rs
 expression: output
 ---
- Esc  clear  ← by →   Name  Image  Status  All  term:
+ Esc  clear  ← by →   All  Name  Image  Status  term:

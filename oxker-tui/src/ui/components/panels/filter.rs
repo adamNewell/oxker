@@ -40,10 +40,10 @@ impl FilterPanel {
             .fg(props.theme.filter.text.into_ratatui_color());
 
         let options = [
+            (" All ", FilterBy::All),
             (" Name ", FilterBy::Name),
             (" Image ", FilterBy::Image),
             (" Status ", FilterBy::Status),
-            (" All ", FilterBy::All),
         ];
 
         options

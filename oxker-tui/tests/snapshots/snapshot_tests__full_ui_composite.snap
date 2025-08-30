@@ -2,7 +2,8 @@
 source: oxker-tui/tests/snapshot_tests.rs
 expression: output
 ---
- Esc  clear  ← by →   Name  Image  Status  All  term: test                                                              
+ Esc  clear  ← by →   All  Name  Image  Status  term: test                                                              
+                                                                                                                        
                                                                                                                         
                                                                                                                         
                                                                                                                         
@@ -31,9 +32,8 @@ expression: output
                   ( e ) exec into a container                                                         │                 
                   ( f ) force clear the screen & redraw the gui                                       │                 
                   ( h ) toggle this help information - or click heading                               │                 
-                  ( s ) save logs to file                                                             │                 
+                  ( s )  or  ( / )  or  ( F1 ) search/filter containers                               │                 
                   ( m ) toggle mouse capture - if disabled, text on screen can be selected & copied   │                 
-                  ( F1 )  or  ( / ) enter filter mode                                                 │                 
                   ( 0 ) stop sort                                                                     │                 
                   ( 1 - 9 ) sort by header - or click header                                          │                 
                   ( - = ) change log section height                                                   │                 

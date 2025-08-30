@@ -78,6 +78,17 @@ impl InputHandler {
         }
     }
 
+    /// Convert Header filter field to FilterField for core command
+    fn get_filter_field(&self) -> oxker_core::events::types::FilterField {
+        use oxker_core::events::types::FilterField;
+        match self.container_state.lock().filter_by {
+            Header::Name => FilterField::Name,
+            Header::Image => FilterField::Image,
+            Header::Status | Header::State => FilterField::Status,
+            _ => FilterField::All, // Header::Id and others map to All
+        }
+    }
+
     /// Sort the containers by a given header
     #[allow(clippy::significant_drop_tightening)]
     async fn sort(&self, selected_header: Header) {
@@ -150,6 +161,24 @@ impl InputHandler {
     fn clear_delete(&self) {
         self.gui_state.lock().set_delete_container(None);
         self.gui_state.lock().status_del(Status::DeleteConfirm);
+    }
+
+    /// Execute the confirmed command
+    async fn confirm_command(&self) {
+        let command_info = self.gui_state.lock().get_command_confirm();
+        if let Some((command, container_id)) = command_info {
+            let core_command = CommandMapper::docker_command_to_core(command, &container_id);
+            if let Err(e) = self.core_handle.execute_command(core_command).await {
+                tracing::error!("Failed to execute command: {}", e);
+                self.gui_state.lock().status_push(Status::Error);
+            }
+            self.clear_command_confirm();
+        }
+    }
+
+    /// Clear command confirmation from gui_status
+    fn clear_command_confirm(&self) {
+        self.gui_state.lock().set_command_confirm(None);
     }
 
     /// Validate that one can exec into a Docker container
@@ -227,17 +256,17 @@ impl InputHandler {
     async fn enter_key(&self) {
         // This isn't great, just means you can't send docker commands before full initialization of the program
         let panel = self.gui_state.lock().get_selected_panel();
-        if panel == SelectablePanel::Commands
-            && let Err(e) = self.execute_selected_command().await
-        {
-            tracing::error!("Failed to execute command: {}", e);
-            self.gui_state.lock().status_push(Status::Error);
+        if panel == SelectablePanel::Commands {
+            // Show confirmation modal instead of directly executing
+            if let Err(e) = self.show_command_confirmation() {
+                tracing::error!("Failed to show command confirmation: {}", e);
+                self.gui_state.lock().status_push(Status::Error);
+            }
         }
     }
 
-    /// Execute the currently selected docker command with proper error handling
-    #[allow(clippy::significant_drop_tightening)]
-    async fn execute_selected_command(&self) -> Result<(), String> {
+    /// Show command confirmation modal for the selected command
+    fn show_command_confirmation(&self) -> Result<(), String> {
         // Get selected container and command from UI state
         let (container_id, command) = {
             let ui_selection = self.gui_state.lock().get_ui_commands_selection();
@@ -252,19 +281,19 @@ impl InputHandler {
                 .get(ui_selection)
                 .ok_or_else(|| "No command selected".to_string())?;
             (container_id, *command)
-        }; // Drop lock before await
+        };
 
-        // Check if running in container
-        if self.core_handle.is_oxker() {
-            return Err("Cannot execute commands from within a container".to_string());
+        // Special handling for Delete command - use existing DeleteConfirm flow
+        if command == oxker_core::DockerCommand::Delete {
+            self.gui_state.lock().set_delete_container(Some(container_id));
+        } else {
+            // Show the new confirmation modal for other commands
+            self.gui_state.lock().set_command_confirm(Some((command, container_id)));
         }
-
-        // Execute the command
-        let core_command = CommandMapper::docker_command_to_core(command, &container_id);
-        self.core_handle.execute_command(core_command).await?;
 
         Ok(())
     }
+
 
     /// If keymap.scroll_modifier is pressed, return 10, else return 1, to speed up scrolling
     fn get_modifier_total(&self, modifier: KeyModifiers) -> u8 {
@@ -418,6 +447,21 @@ impl InputHandler {
         }
     }
 
+    /// Actions to take when CommandConfirm status active
+    async fn handle_command_confirm(&self, key_code: KeyCode) {
+        if key_code == KeyCode::Enter {
+            // Confirm the command
+            self.confirm_command().await;
+        } else if key_code == KeyCode::Esc 
+            || key_code == KeyCode::Char('q')
+            || self.keymap.clear.0 == key_code
+            || self.keymap.clear.1 == Some(key_code)
+        {
+            // Cancel the confirmation
+            self.clear_command_confirm();
+        }
+    }
+
     /// Actions to take when Filter status active
     async fn handle_filter(&self, key_code: KeyCode) {
         match key_code {
@@ -426,7 +470,10 @@ impl InputHandler {
                 // Clear filter by sending empty filter command
                 if let Err(e) = self
                     .core_handle
-                    .execute_command(CoreCommand::FilterContainers(String::new()))
+                    .execute_command(CoreCommand::FilterContainers(
+                        String::new(),
+                        self.get_filter_field(),
+                    ))
                     .await
                 {
                     tracing::error!("Failed to clear filter: {}", e);
@@ -441,7 +488,10 @@ impl InputHandler {
                 let filter_term = self.container_state.lock().filter_term.clone();
                 if let Err(e) = self
                     .core_handle
-                    .execute_command(CoreCommand::FilterContainers(filter_term))
+                    .execute_command(CoreCommand::FilterContainers(
+                        filter_term,
+                        self.get_filter_field(),
+                    ))
                     .await
                 {
                     tracing::error!("Failed to apply filter: {}", e);
@@ -450,15 +500,67 @@ impl InputHandler {
             }
             KeyCode::Backspace => {
                 self.container_state.lock().pop_filter_char();
+                // Apply filter immediately after change
+                let filter_term = self.container_state.lock().filter_term.clone();
+                if let Err(e) = self
+                    .core_handle
+                    .execute_command(CoreCommand::FilterContainers(
+                        filter_term,
+                        self.get_filter_field(),
+                    ))
+                    .await
+                {
+                    tracing::error!("Failed to apply filter: {}", e);
+                }
             }
             KeyCode::Char(x) => {
                 self.container_state.lock().push_filter_char(x);
+                // Apply filter immediately after change
+                let filter_term = self.container_state.lock().filter_term.clone();
+                if let Err(e) = self
+                    .core_handle
+                    .execute_command(CoreCommand::FilterContainers(
+                        filter_term,
+                        self.get_filter_field(),
+                    ))
+                    .await
+                {
+                    tracing::error!("Failed to apply filter: {}", e);
+                }
             }
             KeyCode::Right => {
+                // Update filter field and re-apply the filter if there's a term
                 self.container_state.lock().next_filter_field();
+                let filter_term = self.container_state.lock().filter_term.clone();
+                if !filter_term.is_empty() {
+                    if let Err(e) = self
+                        .core_handle
+                        .execute_command(CoreCommand::FilterContainers(
+                            filter_term,
+                            self.get_filter_field(),
+                        ))
+                        .await
+                    {
+                        tracing::error!("Failed to apply filter: {}", e);
+                    }
+                }
             }
             KeyCode::Left => {
+                // Update filter field and re-apply the filter if there's a term
                 self.container_state.lock().prev_filter_field();
+                let filter_term = self.container_state.lock().filter_term.clone();
+                if !filter_term.is_empty() {
+                    if let Err(e) = self
+                        .core_handle
+                        .execute_command(CoreCommand::FilterContainers(
+                            filter_term,
+                            self.get_filter_field(),
+                        ))
+                        .await
+                    {
+                        tracing::error!("Failed to apply filter: {}", e);
+                    }
+                }
             }
             _ => (),
         }
@@ -588,10 +690,31 @@ impl InputHandler {
                 self.log_panel_toggle();
             }
 
+            // Check for 's' as search key first (before save_logs)
+            _ if key_code == KeyCode::Char('s') && modifier == KeyModifiers::NONE =>
+            {
+                // 's' without modifiers triggers search/filter mode
+                let status = self.gui_state.lock().get_status();
+                if !status.contains(&Status::Filter) {
+                    self.gui_state.lock().status_push(Status::Filter);
+                    // Trigger container refresh when entering filter mode
+                    if let Err(e) = self
+                        .core_handle
+                        .execute_command(CoreCommand::RefreshContainers)
+                        .await
+                    {
+                        tracing::error!("Failed to refresh containers: {}", e);
+                    }
+                }
+            }
+
             _ if self.keymap.save_logs.0 == key_code
                 || self.keymap.save_logs.1 == Some(key_code) =>
             {
-                self.save_key();
+                // Only trigger save_logs if it's not 's' or if 's' has modifiers
+                if key_code != KeyCode::Char('s') || modifier != KeyModifiers::NONE {
+                    self.save_key();
+                }
             }
 
             _ if self.keymap.select_next_panel.0 == key_code
@@ -705,6 +828,8 @@ impl InputHandler {
                 self.handle_filter(key_code).await;
             } else if contains_delete {
                 self.handle_delete(key_code).await;
+            } else if status.contains(&Status::CommandConfirm) {
+                self.handle_command_confirm(key_code).await;
             } else {
                 self.handle_others(key_code, key_modifier).await;
             }

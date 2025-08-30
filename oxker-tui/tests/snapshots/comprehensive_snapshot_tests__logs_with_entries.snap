@@ -2,7 +2,7 @@
 source: oxker-tui/tests/comprehensive_snapshot_tests.rs
 expression: "render_component(&logs_panel, &props, 80, 15)"
 ---
-┌ Logs ────────────────────────────────────────────────────────────────────────┐
+┌ Logs 1/5 - Container Logs ───────────────────────────────────────────────────┐
 │→ [2024-01-01 10:00:00] Starting nginx                                        │
 │  [2024-01-01 10:00:01] nginx: [notice] 1#1: using the "epoll" event method   │
 │  [2024-01-01 10:00:01] nginx: [notice] 1#1: nginx/1.25.3                     │

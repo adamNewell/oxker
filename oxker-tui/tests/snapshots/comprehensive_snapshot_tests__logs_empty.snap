@@ -2,7 +2,7 @@
 source: oxker-tui/tests/comprehensive_snapshot_tests.rs
 expression: "render_component(&logs_panel, &props, 80, 15)"
 ---
-┌ Logs ────────────────────────────────────────────────────────────────────────┐
+┌ Logs 0/0 ────────────────────────────────────────────────────────────────────┐
 │                                 no logs found                                │
 │                                                                              │
 │                                                                              │

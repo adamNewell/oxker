@@ -18,7 +18,7 @@ use ratatui::{
 };
 use std::sync::Arc;
 
-const MARGIN: &str = " ";
+const MARGIN: &str = "  "; // Two spaces for better column separation
 const CIRCLE: &str = "◉ ";
 
 /// Containers panel component that displays the list of containers
@@ -80,14 +80,14 @@ impl ContainersPanel {
             ),
             Span::styled(
                 format!(
-                    "{:>width_current$} / {:>width_limit$}{MARGIN}",
+                    "{:>width_current$} / {}",
                     container.mem_stats,
                     container.mem_limit,
-                    width_current = widths.mem.1.into(),
-                    width_limit = widths.mem.2.into()
+                    width_current = widths.mem.1.into()
                 ),
                 state_style,
             ),
+            Span::raw(MARGIN),
             Span::styled(
                 format!(
                     "{:>width$}{MARGIN}",

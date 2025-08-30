@@ -54,10 +54,10 @@ impl fmt::Display for Header {
 #[derive(Debug, Clone, Default, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum FilterBy {
     #[default]
+    All,
     Name,
     Image,
     Status,
-    All,
 }
 
 /// Convert errors into strings to display
@@ -67,10 +67,10 @@ impl fmt::Display for FilterBy {
             f,
             "{}",
             match self {
+                Self::All => "All",
                 Self::Name => "Name",
                 Self::Image => "Image",
                 Self::Status => "Status",
-                Self::All => "All",
             }
         )
     }
@@ -79,19 +79,19 @@ impl fmt::Display for FilterBy {
 impl FilterBy {
     const fn next(self) -> Option<Self> {
         match self {
+            Self::All => Some(Self::Name),
             Self::Name => Some(Self::Image),
             Self::Image => Some(Self::Status),
-            Self::Status => Some(Self::All),
-            Self::All => None,
+            Self::Status => None,
         }
     }
 
     const fn prev(self) -> Option<Self> {
         match self {
-            Self::Name => None,
+            Self::All => None,
+            Self::Name => Some(Self::All),
             Self::Image => Some(Self::Name),
             Self::Status => Some(Self::Image),
-            Self::All => Some(Self::Status),
         }
     }
 }
@@ -143,7 +143,7 @@ impl AppData {
             filter: Filter::new(),
             hidden_containers: vec![],
             event_bus,
-            sorted_by: None,
+            sorted_by: Some((Header::Name, SortedOrder::Asc)), // Default sort by Name ascending
         }
     }
 
@@ -160,6 +160,20 @@ impl AppData {
     #[must_use]
     pub const fn get_filter(&self) -> (FilterBy, Option<&String>) {
         (self.filter.by, self.filter.term.as_ref())
+    }
+
+    /// Set the filter term
+    pub fn set_filter_term(&mut self, term: Option<String>) {
+        self.filter.term = term;
+    }
+
+    /// Set the filter by field
+    pub fn set_filter_by(&mut self, filter_by: FilterBy) {
+        self.filter.by = filter_by;
+        // Only re-filter if there's an active filter term
+        if self.filter.term.is_some() {
+            self.re_filter();
+        }
     }
 
     /// Check if a given container can be inserted into the "visible" list, based on current filter term and filter_by
@@ -182,7 +196,7 @@ impl AppData {
     /// Remove items from the containers list based on the filter term, and insert into a "hidden" vec
     /// sets the state to start if any filtering has occurred
     /// Also search in the "hidden" vec for items and insert back into the main containers vec
-    fn filter_containers(&mut self) {
+    pub fn filter_containers(&mut self) {
         // Event will be emitted after filtering is complete
         let pre_len = self.get_container_len();
 
@@ -281,7 +295,7 @@ impl AppData {
 
     /// Container sort related methods
     /// Change the sorted order, also set the selected container state to match new order
-    fn set_sorted(&mut self, x: Option<(Header, SortedOrder)>) {
+    pub fn set_sorted(&mut self, x: Option<(Header, SortedOrder)>) {
         self.sorted_by = x;
         self.sort_containers();
         self.containers.state.select(
@@ -331,6 +345,7 @@ impl AppData {
         let pre_order = self.get_current_ids();
 
         if let Some((head, ord)) = self.sorted_by {
+            tracing::debug!("Sorting containers by {:?} {:?}", head, ord);
             let sort_closure = |a: &ContainerItem, b: &ContainerItem| -> std::cmp::Ordering {
                 let item_ord = match ord {
                     SortedOrder::Asc => (a, b),
@@ -1018,6 +1033,11 @@ impl AppData {
         for container in all_containers {
             self.update_or_insert_container(container);
         }
+        
+        // Apply sorting if configured
+        if self.sorted_by.is_some() {
+            self.sort_containers();
+        }
 
         // Publish ContainerListUpdate event with current container data
         // Only publish if we're in a tokio runtime (not all tests use tokio)
@@ -1412,6 +1432,19 @@ mod tests {
         assert_eq!(a.id, ContainerId::from("2"));
         assert_eq!(b.id, ContainerId::from("3"));
         assert_eq!(c.id, ContainerId::from("1"));
+    }
+
+    #[test]
+    /// Test that AppData defaults to sorting by Name ascending
+    fn test_default_sort_by_name() {
+        use crate::tests::gen_config;
+        
+        let (event_bus, _receiver) = EventBus::new(100);
+        let event_bus = Arc::new(event_bus);
+        let app_data = AppData::new(gen_config(), event_bus);
+        
+        // Check that default sort is by Name ascending
+        assert_eq!(app_data.sorted_by, Some((Header::Name, SortedOrder::Asc)));
     }
 
     #[test]
@@ -1859,8 +1892,9 @@ mod tests {
         for c in ['i', 'm', 'a', 'g', 'e', '_', '2'] {
             app_data.filter_term_push(c);
         }
-        // app_data.filter_term_push('2');
-        app_data.filter_by_next();
+        // Start at All, go to Name, then Image
+        app_data.filter_by_next(); // All -> Name
+        app_data.filter_by_next(); // Name -> Image
 
         assert_eq!(
             app_data.get_filter(),
@@ -1889,8 +1923,10 @@ mod tests {
         let pre_len = app_data.containers.items.len();
         app_data.filter_term_push('x');
 
-        app_data.filter_by_next();
-        app_data.filter_by_next();
+        // Start at All, go to Name, Image, then Status
+        app_data.filter_by_next(); // All -> Name
+        app_data.filter_by_next(); // Name -> Image
+        app_data.filter_by_next(); // Image -> Status
 
         assert_eq!(
             app_data.get_filter(),
@@ -1919,10 +1955,7 @@ mod tests {
         let pre_len = app_data.containers.items.len();
         app_data.filter_term_push('x');
 
-        app_data.filter_by_next();
-        app_data.filter_by_next();
-        app_data.filter_by_next();
-
+        // Already at All by default, no need to navigate
         assert_eq!(
             app_data.get_filter(),
             (FilterBy::All, Some(&"x".to_string()))
@@ -1950,8 +1983,10 @@ mod tests {
         let pre_len = app_data.containers.items.len();
         app_data.filter_term_push('x');
 
-        app_data.filter_by_next();
-        app_data.filter_by_next();
+        // Start at All, go to Name, Image, then Status
+        app_data.filter_by_next(); // All -> Name
+        app_data.filter_by_next(); // Name -> Image
+        app_data.filter_by_next(); // Image -> Status
 
         assert_eq!(
             app_data.get_filter(),
@@ -1967,7 +2002,7 @@ mod tests {
         assert!(!app_data.can_insert(&containers[1]));
         assert!(!app_data.can_insert(&containers[2]));
 
-        app_data.filter_by_prev();
+        app_data.filter_by_prev(); // Status -> Image
         assert_eq!(
             app_data.get_filter(),
             (FilterBy::Image, Some(&"x".to_string()))
