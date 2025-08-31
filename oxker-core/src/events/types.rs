@@ -52,6 +52,17 @@ pub enum CoreEvent {
     LoadingStarted(String),           // UUID as string
     LoadingFinished(String),          // UUID as string
     ContainerDeletionStarted(String), // Container ID
+    // Debug events for performance monitoring
+    DebugLatency {
+        operation: String,
+        latency_ms: u64,
+        context: Option<String>,
+    },
+    DebugInfo {
+        category: String,
+        message: String,
+        metadata: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,6 +224,55 @@ mod tests {
                 assert_eq!(logs.len(), 2);
                 assert_eq!(logs[0].message, "Starting application");
                 assert_eq!(logs[1].message, "Application ready");
+            }
+            _ => panic!("Wrong event type"),
+        }
+    }
+
+    #[test]
+    fn test_debug_events() {
+        // Test DebugLatency event
+        let latency_event = CoreEvent::DebugLatency {
+            operation: "container_refresh".to_string(),
+            latency_ms: 150,
+            context: Some("docker ps -a".to_string()),
+        };
+
+        let serialized = serde_json::to_string(&latency_event).unwrap();
+        let deserialized: CoreEvent = serde_json::from_str(&serialized).unwrap();
+
+        match deserialized {
+            CoreEvent::DebugLatency {
+                operation,
+                latency_ms,
+                context,
+            } => {
+                assert_eq!(operation, "container_refresh");
+                assert_eq!(latency_ms, 150);
+                assert_eq!(context, Some("docker ps -a".to_string()));
+            }
+            _ => panic!("Wrong event type"),
+        }
+
+        // Test DebugInfo event
+        let info_event = CoreEvent::DebugInfo {
+            category: "EventBus".to_string(),
+            message: "Published ContainerListUpdate".to_string(),
+            metadata: None,
+        };
+
+        let serialized = serde_json::to_string(&info_event).unwrap();
+        let deserialized: CoreEvent = serde_json::from_str(&serialized).unwrap();
+
+        match deserialized {
+            CoreEvent::DebugInfo {
+                category,
+                message,
+                metadata,
+            } => {
+                assert_eq!(category, "EventBus");
+                assert_eq!(message, "Published ContainerListUpdate");
+                assert_eq!(metadata, None);
             }
             _ => panic!("Wrong event type"),
         }

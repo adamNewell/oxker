@@ -1,4 +1,4 @@
-use crate::handlers::UIContainerState;
+use crate::handlers::{DebugEvent, UIContainerState};
 use crate::ui::gui_state::{GuiState, Status};
 use oxker_core::{
     AppColors, AppError, ByteStats, Columns, ContainerId, ContainerPorts, CpuStats, DockerCommand,
@@ -77,6 +77,7 @@ pub struct FrameViewModel {
     pub scroll_title: Option<String>,
     pub sorted_by: Option<(Header, SortedOrder)>,
     pub status: HashSet<Status>,
+    pub debug_events: Vec<DebugEvent>,
 }
 
 impl FrameViewModel {
@@ -231,6 +232,7 @@ impl FrameViewModel {
                 )
             }),
             status: gui_state.get_status(),
+            debug_events: ui_state.debug_events.iter().cloned().collect(),
         }
     }
 }
@@ -265,6 +267,7 @@ impl Default for FrameViewModel {
             scroll_title: None,
             sorted_by: None,
             status: HashSet::new(),
+            debug_events: Vec::new(),
         }
     }
 }

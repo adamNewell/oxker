@@ -43,4 +43,9 @@ impl Rerender {
             Err(current_value) => current_value,
         }
     }
+
+    /// Check if a redraw is pending without clearing the flag
+    pub fn is_draw_pending(&self) -> bool {
+        self.draw.load(Ordering::SeqCst)
+    }
 }

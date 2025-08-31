@@ -5,8 +5,9 @@ use crate::ui::{
     components::{
         Component,
         panels::{
-            ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DeleteConfirmPanel,
-            ErrorPanel, FilterPanel, HeadersPanel, HelpPanel, LogsPanel, PortsPanel,
+            ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DebugPanel,
+            DeleteConfirmPanel, ErrorPanel, FilterPanel, HeadersPanel, HelpPanel, LogsPanel,
+            PortsPanel,
         },
         widgets::{InfoBox, LoadingIndicator},
     },
@@ -33,6 +34,7 @@ pub struct MainView<'a> {
     error: ErrorPanel,
     help: HelpPanel,
     info_box: InfoBox,
+    debug: DebugPanel,
 
     // References passed in from parent
     config: &'a Config,
@@ -61,6 +63,7 @@ impl<'a> MainView<'a> {
             error: ErrorPanel::new(),
             help: HelpPanel::new(),
             info_box: InfoBox::new(),
+            debug: DebugPanel::new(),
             config,
             keymap,
             gui_state,
@@ -109,6 +112,15 @@ impl<'a> MainView<'a> {
         Layout::default()
             .direction(Direction::Vertical)
             .constraints(constraints)
+            .split(area)
+            .to_vec()
+    }
+
+    /// Calculate logs/debug split for debug mode (70% logs, 30% debug)
+    fn calculate_logs_debug_split(area: Rect) -> Vec<Rect> {
+        Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(70), Constraint::Percentage(30)])
             .split(area)
             .to_vec()
     }
@@ -189,14 +201,39 @@ impl super::View for MainView<'_> {
                 .render(&containers_props, containers_commands[0], frame);
 
             if model.show_logs && containers_logs_section.len() > 1 {
-                let logs_props = crate::ui::components::panels::logs::LogsPanelProps {
-                    view_model: model,
-                    theme,
-                    gui_state: self.gui_state,
-                    container_state: self.container_state,
-                };
-                self.logs
-                    .render(&logs_props, containers_logs_section[1], frame);
+                if self.gui_state.lock().is_debug_mode_enabled() {
+                    // In debug mode, split logs section horizontally
+                    let logs_debug_split =
+                        Self::calculate_logs_debug_split(containers_logs_section[1]);
+
+                    // Render logs in 70% of the space
+                    let logs_props = crate::ui::components::panels::logs::LogsPanelProps {
+                        view_model: model,
+                        theme,
+                        gui_state: self.gui_state,
+                        container_state: self.container_state,
+                    };
+                    self.logs.render(&logs_props, logs_debug_split[0], frame);
+
+                    // Render debug panel in 30% of the space
+                    let debug_props = crate::ui::components::panels::debug::DebugPanelProps {
+                        view_model: model,
+                        theme,
+                        gui_state: self.gui_state,
+                        container_state: self.container_state,
+                    };
+                    self.debug.render(&debug_props, logs_debug_split[1], frame);
+                } else {
+                    // Normal mode - logs take full width
+                    let logs_props = crate::ui::components::panels::logs::LogsPanelProps {
+                        view_model: model,
+                        theme,
+                        gui_state: self.gui_state,
+                        container_state: self.container_state,
+                    };
+                    self.logs
+                        .render(&logs_props, containers_logs_section[1], frame);
+                }
             }
 
             if model.has_containers {

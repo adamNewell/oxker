@@ -48,6 +48,10 @@ pub struct Args {
     /// Path to a config file, readable as TOML, JSONC, or JSON
     #[clap(long="config-file", short = None)]
     pub config_file: Option<String>,
+
+    /// Enable debug mode with realtime event display
+    #[clap(long = "debug")]
+    pub debug: bool,
 }
 
 impl Default for Args {
@@ -64,6 +68,7 @@ impl Default for Args {
             timezone: None,
             save_dir: None,
             config_file: None,
+            debug: false,
         }
     }
 }

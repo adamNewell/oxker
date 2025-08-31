@@ -455,6 +455,7 @@ fn benchmark_full_ui_render(c: &mut Criterion) {
                     timezone: Some(jiff::tz::TimeZone::UTC),
                     timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
                     show_logs: true,
+                    debug_mode: false,
                 };
                 let mut terminal = create_test_terminal();
 

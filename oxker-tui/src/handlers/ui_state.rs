@@ -6,6 +6,16 @@ use oxker_core::{
     StatefulList,
 };
 use std::collections::VecDeque;
+use std::time::SystemTime;
+
+/// Debug event for displaying in debug panel
+#[derive(Clone, Debug)]
+pub struct DebugEvent {
+    pub timestamp: SystemTime,
+    pub event_type: String,
+    pub details: String,
+    pub latency_ms: Option<u64>,
+}
 
 /// UI-specific state for managing containers
 /// This maintains the state needed for rendering and user interaction
@@ -31,6 +41,8 @@ pub struct UIContainerState {
     version: u64,
     /// Last significant change version
     last_significant_change: u64,
+    /// Debug events for debug panel
+    pub debug_events: VecDeque<DebugEvent>,
 }
 
 impl UIContainerState {
@@ -55,6 +67,7 @@ impl UIContainerState {
             sort_ascending: true,  // Default to ascending order (should show ▲)
             version: 0,
             last_significant_change: 0,
+            debug_events: VecDeque::with_capacity(1000),
         }
     }
 
@@ -446,6 +459,31 @@ impl UIContainerState {
             Header::Image => Header::Name,   // Image -> Name
             Header::Status => Header::Image, // Status -> Image
         };
+    }
+
+    /// Add a debug event to the history
+    pub fn add_debug_event(
+        &mut self,
+        event_type: String,
+        details: String,
+        latency_ms: Option<u64>,
+    ) {
+        let event = DebugEvent {
+            timestamp: SystemTime::now(),
+            event_type,
+            details,
+            latency_ms,
+        };
+
+        self.debug_events.push_back(event);
+
+        // Keep only the most recent 1000 events
+        while self.debug_events.len() > 1000 {
+            self.debug_events.pop_front();
+        }
+
+        // Increment version to trigger redraw
+        self.version = self.version.wrapping_add(1);
     }
 }
 

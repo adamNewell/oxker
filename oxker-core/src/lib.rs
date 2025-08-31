@@ -66,6 +66,7 @@ pub mod tests {
             show_timestamp: false,
             show_logs: true,
             timezone: None,
+            debug_mode: false,
         }
     }
 

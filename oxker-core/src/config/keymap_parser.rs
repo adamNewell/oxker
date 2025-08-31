@@ -66,7 +66,8 @@ optional_config_struct!(
     sort_by_tx,
     sort_reset,
     toggle_help,
-    toggle_mouse_capture
+    toggle_mouse_capture,
+    toggle_debug
 );
 
 config_struct!(
@@ -101,7 +102,8 @@ config_struct!(
     sort_by_tx,
     sort_reset,
     toggle_help,
-    toggle_mouse_capture
+    toggle_mouse_capture,
+    toggle_debug
 );
 
 impl Default for Keymap {
@@ -146,6 +148,7 @@ impl Keymap {
             sort_reset: (KeyCode::Char('0'), None),
             toggle_help: (KeyCode::Char('h'), None),
             toggle_mouse_capture: (KeyCode::Char('m'), None),
+            toggle_debug: (KeyCode::F(12), None),
         }
     }
 }
@@ -241,6 +244,7 @@ impl From<Option<ConfigKeymap>> for Keymap {
                 &mut keymap.toggle_mouse_capture,
                 &mut clash,
             );
+            update_keymap(ck.toggle_debug, &mut keymap.toggle_debug, &mut clash);
             // TODO need to check for clashes when using additional modifiers
             if let Some(scroll_many) = Self::try_parse_modifier(ck.scroll_many) {
                 keymap.scroll_many = scroll_many;
@@ -422,6 +426,7 @@ mod tests {
             sort_reset: None,
             toggle_help: None,
             toggle_mouse_capture: None,
+            toggle_debug: None,
         };
 
         let result = Keymap::from(Some(input));
@@ -467,6 +472,7 @@ mod tests {
             sort_reset: gen_v((",", ".")),
             toggle_help: gen_v(("-", "=")),
             toggle_mouse_capture: gen_v(("\\", "/")),
+            toggle_debug: None,
         };
 
         let result = Keymap::from(Some(input));
@@ -503,6 +509,7 @@ mod tests {
             sort_reset: (KeyCode::Char(','), Some(KeyCode::Char('.'))),
             toggle_help: (KeyCode::Char('-'), Some(KeyCode::Char('='))),
             toggle_mouse_capture: (KeyCode::Char('\\'), Some(KeyCode::Char('/'))),
+            toggle_debug: (KeyCode::F(12), None),
             scroll_many: KeyModifiers::ALT,
         };
         assert_eq!(expected, result);

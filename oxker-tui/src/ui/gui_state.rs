@@ -108,6 +108,8 @@ pub struct GuiState {
     // UI-only selection states (don't affect business logic)
     ui_commands_selection: usize,
     ui_logs_position: usize,
+    // Runtime debug mode toggle
+    debug_mode_enabled: bool,
 }
 impl GuiState {
     pub fn new(redraw: &Arc<Rerender>, show_logs: bool) -> Self {
@@ -134,6 +136,7 @@ impl GuiState {
             status: HashSet::new(),
             ui_commands_selection: 0,
             ui_logs_position: 0,
+            debug_mode_enabled: false,
         }
     }
     /// Increase the height of the log panel, then rerender
@@ -502,6 +505,18 @@ impl GuiState {
     /// Force an immediate redraw of the UI
     pub fn force_redraw(&mut self) {
         self.rerender.update_draw();
+    }
+
+    /// Toggle debug mode on/off
+    pub fn toggle_debug_mode(&mut self) {
+        self.debug_mode_enabled = !self.debug_mode_enabled;
+        self.rerender.update_draw();
+    }
+
+    /// Check if debug mode is enabled
+    #[must_use]
+    pub const fn is_debug_mode_enabled(&self) -> bool {
+        self.debug_mode_enabled
     }
 
     /// UI-only selection management (no business logic impact)

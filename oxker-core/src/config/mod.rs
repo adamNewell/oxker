@@ -34,6 +34,7 @@ pub struct Config {
     pub timezone: Option<TimeZone>,
     pub timestamp_format: String,
     pub show_logs: bool,
+    pub debug_mode: bool,
 }
 
 impl From<&Args> for Config {
@@ -55,6 +56,7 @@ impl From<&Args> for Config {
             timezone: Self::parse_timezone(args.timezone.clone()),
             timestamp_format: Self::parse_timestamp_format(None),
             show_logs: true,
+            debug_mode: args.debug,
         }
     }
 }
@@ -78,6 +80,7 @@ impl From<ConfigFile> for Config {
             timezone: Self::parse_timezone(config_file.timezone),
             timestamp_format: Self::parse_timestamp_format(config_file.timestamp_format),
             show_logs: config_file.show_logs.unwrap_or(true),
+            debug_mode: false, // Config file doesn't support debug mode
         }
     }
 }
@@ -188,6 +191,11 @@ impl Config {
         if self.color_logs && self.raw_logs {
             self.raw_logs = false;
         }
+
+        if config_from_cli.debug_mode != default_args.debug {
+            self.debug_mode = config_from_cli.debug_mode;
+        }
+
         self
     }
 

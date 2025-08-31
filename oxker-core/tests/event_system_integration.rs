@@ -18,6 +18,7 @@ const fn gen_config() -> Config {
         timezone: None,
         timestamp_format: String::new(),
         show_logs: true,
+        debug_mode: false,
     }
 }
 

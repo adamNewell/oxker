@@ -20,6 +20,7 @@ fn create_test_config(network_interface: Option<String>) -> Config {
         timezone: None,
         timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
         show_logs: true,
+        debug_mode: false,
     }
 }
 

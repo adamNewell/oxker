@@ -153,6 +153,7 @@ impl InputHandler {
             if let Err(e) = self.core_handle.execute_command(core_command).await {
                 tracing::error!("Failed to delete container: {}", e);
                 self.gui_state.lock().status_push(Status::Error);
+                self.gui_state.lock().force_redraw();
             }
         }
     }
@@ -171,6 +172,7 @@ impl InputHandler {
             if let Err(e) = self.core_handle.execute_command(core_command).await {
                 tracing::error!("Failed to execute command: {}", e);
                 self.gui_state.lock().status_push(Status::Error);
+                self.gui_state.lock().force_redraw();
             }
             self.clear_command_confirm();
         }
@@ -195,6 +197,7 @@ impl InputHandler {
                 // Set the exec container ID in the GUI state
                 self.gui_state.lock().set_exec_container_id(Some(id));
                 self.gui_state.lock().status_push(Status::Exec);
+                self.gui_state.lock().force_redraw();
             } else {
                 self.gui_state.lock().set_info_box("No container selected");
             }
@@ -244,6 +247,7 @@ impl InputHandler {
 
         if !contains(Status::Logs) {
             self.gui_state.lock().status_push(Status::Logs);
+            self.gui_state.lock().force_redraw();
             let uuid = Uuid::new_v4();
             GuiState::start_loading_animation(&self.gui_state, uuid);
             self.save_logs();
@@ -261,6 +265,7 @@ impl InputHandler {
             if let Err(e) = self.show_command_confirmation() {
                 tracing::error!("Failed to show command confirmation: {}", e);
                 self.gui_state.lock().status_push(Status::Error);
+                self.gui_state.lock().force_redraw();
             }
         }
     }
@@ -333,12 +338,14 @@ impl InputHandler {
     /// If no containers, and on Commands panel, skip to next panel, as Commands panel isn't visible in this state
     fn next_panel_key(&self) {
         self.gui_state.lock().selectable_panel_next();
+        self.gui_state.lock().force_redraw();
     }
 
     /// Change to previously selected panel
     /// Need to skip the commands planel if there no are current containers running
     fn previous_panel_key(&self) {
         self.gui_state.lock().selectable_panel_previous();
+        self.gui_state.lock().force_redraw();
     }
 
     #[allow(clippy::significant_drop_in_scrutinee)]
@@ -347,6 +354,7 @@ impl InputHandler {
         match selected_panel {
             SelectablePanel::Containers => {
                 self.container_state.lock().first_container();
+                self.gui_state.lock().force_redraw();
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
@@ -376,6 +384,7 @@ impl InputHandler {
         match selected_panel {
             SelectablePanel::Containers => {
                 self.container_state.lock().last_container();
+                self.gui_state.lock().force_redraw();
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
@@ -482,6 +491,7 @@ impl InputHandler {
                     tracing::error!("Failed to clear filter: {}", e);
                 }
                 self.gui_state.lock().status_del(Status::Filter);
+                self.gui_state.lock().force_redraw();
             }
             _ if KeyCode::Enter == key_code
                 || self.keymap.filter_mode.0 == key_code
@@ -500,9 +510,11 @@ impl InputHandler {
                     tracing::error!("Failed to apply filter: {}", e);
                 }
                 self.gui_state.lock().status_del(Status::Filter);
+                self.gui_state.lock().force_redraw();
             }
             KeyCode::Backspace => {
                 self.container_state.lock().pop_filter_char();
+                self.gui_state.lock().force_redraw();
                 // Apply filter immediately after change
                 let filter_term = self.container_state.lock().filter_term.clone();
                 if let Err(e) = self
@@ -518,6 +530,7 @@ impl InputHandler {
             }
             KeyCode::Char(x) => {
                 self.container_state.lock().push_filter_char(x);
+                self.gui_state.lock().force_redraw();
                 // Apply filter immediately after change
                 let filter_term = self.container_state.lock().filter_term.clone();
                 if let Err(e) = self
@@ -534,6 +547,7 @@ impl InputHandler {
             KeyCode::Right => {
                 // Update filter field and re-apply the filter if there's a term
                 self.container_state.lock().next_filter_field();
+                self.gui_state.lock().force_redraw();
                 let filter_term = self.container_state.lock().filter_term.clone();
                 if !filter_term.is_empty()
                     && let Err(e) = self
@@ -550,6 +564,7 @@ impl InputHandler {
             KeyCode::Left => {
                 // Update filter field and re-apply the filter if there's a term
                 self.container_state.lock().prev_filter_field();
+                self.gui_state.lock().force_redraw();
                 let filter_term = self.container_state.lock().filter_term.clone();
                 if !filter_term.is_empty()
                     && let Err(e) = self
@@ -664,15 +679,30 @@ impl InputHandler {
                 || self.keymap.toggle_help.1 == Some(key_code)
                 || key_code == KeyCode::Char('?') =>
             {
+                let help_start = std::time::Instant::now();
                 self.gui_state.lock().status_push(Status::Help);
                 // Force immediate redraw when opening help
                 self.gui_state.lock().force_redraw();
+
+                // Track help modal open latency (only displayed when debug panel is visible)
+                self.core_handle
+                    .emit_debug_latency(
+                        "HelpModalOpen".to_string(),
+                        u64::try_from(help_start.elapsed().as_millis()).unwrap_or(u64::MAX),
+                    )
+                    .await;
             }
 
             _ if self.keymap.toggle_mouse_capture.0 == key_code
                 || self.keymap.toggle_mouse_capture.1 == Some(key_code) =>
             {
                 self.mouse_capture_key();
+            }
+
+            _ if self.keymap.toggle_debug.0 == key_code
+                || self.keymap.toggle_debug.1 == Some(key_code) =>
+            {
+                self.gui_state.lock().toggle_debug_mode();
             }
             _ if self.keymap.log_section_height_decrease.0 == key_code
                 || self.keymap.log_section_height_decrease.1 == Some(key_code) =>
@@ -698,6 +728,7 @@ impl InputHandler {
                 let status = self.gui_state.lock().get_status();
                 if !status.contains(&Status::Filter) {
                     self.gui_state.lock().status_push(Status::Filter);
+                    self.gui_state.lock().force_redraw();
                     // Trigger container refresh when entering filter mode
                     if let Err(e) = self
                         .core_handle
@@ -787,6 +818,9 @@ impl InputHandler {
 
     /// Handle keyboard button events
     async fn button_press(&mut self, key_code: KeyCode, key_modifier: KeyModifiers) {
+        // Track input latency in debug mode
+        let start_time = std::time::Instant::now();
+
         let status = self.gui_state.lock().get_status();
         let contains = |s: Status| status.contains(&s);
 
@@ -819,6 +853,15 @@ impl InputHandler {
                 self.handle_others(key_code, key_modifier).await;
             }
         }
+
+        // Emit debug latency event (only displayed when debug panel is visible)
+        let latency = start_time.elapsed();
+        self.core_handle
+            .emit_debug_latency(
+                format!("KeyPress({key_code:?})"),
+                u64::try_from(latency.as_millis()).unwrap_or(u64::MAX),
+            )
+            .await;
     }
 
     /// Check if a button press interacts with either the yes or no buttons in the delete container confirm window
@@ -879,6 +922,7 @@ impl InputHandler {
                 for _ in 0..self.get_modifier_total(modifier) {
                     self.container_state.lock().next_container();
                 }
+                self.gui_state.lock().force_redraw();
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container
@@ -914,6 +958,7 @@ impl InputHandler {
                 for _ in 0..self.get_modifier_total(modifier) {
                     self.container_state.lock().previous_container();
                 }
+                self.gui_state.lock().force_redraw();
                 // Reset UI logs position when switching containers
                 self.gui_state.lock().set_ui_logs_position(0);
                 // Trigger log refresh for newly selected container

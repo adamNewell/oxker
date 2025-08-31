@@ -234,6 +234,7 @@ pub mod tests {
             raw_logs: false,
             show_std_err: false,
             host: None,
+            debug_mode: false,
         }
     }
 

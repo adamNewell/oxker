@@ -89,6 +89,40 @@ impl UIEventHandler {
                     }
                     self.rerender.update_draw();
                 }
+                CoreEvent::DebugLatency {
+                    operation,
+                    latency_ms,
+                    context,
+                } => {
+                    debug!(
+                        "Debug latency event - {}: {}ms (context: {:?})",
+                        operation, latency_ms, context
+                    );
+                    // Add to debug events for display in debug panel
+                    self.container_state.lock().add_debug_event(
+                        "Latency".to_string(),
+                        format!("{} ({})", operation, context.as_deref().unwrap_or("")),
+                        Some(latency_ms),
+                    );
+                    self.rerender.update_draw();
+                }
+                CoreEvent::DebugInfo {
+                    category,
+                    message,
+                    metadata,
+                } => {
+                    debug!(
+                        "Debug info event - {}: {} (metadata: {:?})",
+                        category, message, metadata
+                    );
+                    // Add to debug events for display in debug panel
+                    self.container_state.lock().add_debug_event(
+                        category.clone(),
+                        format!("{} {}", message, metadata.as_deref().unwrap_or("")),
+                        None,
+                    );
+                    self.rerender.update_draw();
+                }
             }
         }
 

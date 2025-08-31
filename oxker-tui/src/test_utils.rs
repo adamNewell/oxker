@@ -48,6 +48,7 @@ pub mod test_utils {
                     raw_logs: false,
                     show_std_err: false,
                     host: None,
+                    debug_mode: false,
                 },
             }
         }
@@ -376,6 +377,7 @@ pub mod test_utils {
             show_timestamp: false,
             show_logs: true,
             timezone: None,
+            debug_mode: false,
         }
     }
 

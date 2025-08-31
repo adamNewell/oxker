@@ -28,6 +28,7 @@ fn main() {
         raw_logs: false,
         show_std_err: false,
         host: None,
+        debug_mode: false,
     };
 
     let rerender = Arc::new(Rerender::new());

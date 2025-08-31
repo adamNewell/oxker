@@ -34,6 +34,7 @@ use crate::input_handler::InputMessages;
 use oxker_core::{AppColors, AppError, Config, Keymap};
 
 const POLL_RATE: Duration = std::time::Duration::from_millis(50);
+const IMMEDIATE_POLL_RATE: Duration = std::time::Duration::from_millis(1);
 
 // could have a render struct, which takes in poll rate, and docker
 
@@ -286,7 +287,14 @@ impl Ui {
                 }
             }
 
-            if crossterm::event::poll(POLL_RATE).unwrap_or(false)
+            // Use immediate poll rate when a redraw is pending for instant response
+            let poll_duration = if self.rerender.is_draw_pending() {
+                IMMEDIATE_POLL_RATE
+            } else {
+                POLL_RATE
+            };
+
+            if crossterm::event::poll(poll_duration).unwrap_or(false)
                 && let Ok(event) = event::read()
             {
                 if let Event::Key(key) = event {

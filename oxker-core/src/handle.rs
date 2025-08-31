@@ -428,6 +428,30 @@ impl CoreHandle {
     pub fn is_oxker(&self) -> bool {
         self.app_data.lock().is_oxker()
     }
+
+    /// Emit a debug event for latency tracking
+    pub async fn emit_debug_latency(&self, operation: String, latency_ms: u64) {
+        self.event_bus
+            .publish(CoreEvent::DebugLatency {
+                operation,
+                latency_ms,
+                context: None,
+            })
+            .await
+            .ok();
+    }
+
+    /// Emit a debug info event
+    pub async fn emit_debug_info(&self, category: String, message: String) {
+        self.event_bus
+            .publish(CoreEvent::DebugInfo {
+                category,
+                message,
+                metadata: None,
+            })
+            .await
+            .ok();
+    }
 }
 
 /// A read-only view of the core state.
