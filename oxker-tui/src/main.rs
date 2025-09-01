@@ -15,6 +15,7 @@ use tracing::{Level, error, info};
 use oxker_core::{Config, CoreHandle, EventBus};
 
 use oxker_tui::handlers::UIEventHandler;
+use oxker_tui::terminal_guard::install_panic_handler;
 use oxker_tui::ui::{GuiState, Rerender, Ui};
 
 /// Enable tracing, only really used in debug mode, for now
@@ -67,20 +68,8 @@ fn handler_init(
 async fn main() {
     setup_tracing();
 
-    // Set panic hook to clean up terminal on panic
-    std::panic::set_hook(Box::new(|panic_info| {
-        // Clean up terminal before panic
-        let _ = crossterm::terminal::disable_raw_mode();
-        let _ = crossterm::execute!(
-            std::io::stdout(),
-            crossterm::terminal::LeaveAlternateScreen,
-            crossterm::event::DisableMouseCapture,
-            crossterm::cursor::Show
-        );
-
-        // Print panic info
-        eprintln!("Application panicked: {panic_info}");
-    }));
+    // Install enhanced panic handler that properly restores terminal state
+    install_panic_handler();
     let config = Config::new();
     let redraw = Arc::new(Rerender::new());
 

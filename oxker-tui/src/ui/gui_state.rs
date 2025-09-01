@@ -237,6 +237,17 @@ impl GuiState {
             .map(|data| *data.0)
     }
 
+    /// Check if a given Rect (a clicked area of 1x1), interacts with any known confirmation button
+    #[must_use]
+    pub fn get_intersect_confirm_button(&self, rect: Rect) -> Option<ConfirmationButton> {
+        self.intersect_confirm
+            .iter()
+            .filter(|i| i.1.intersects(rect))
+            .collect::<Vec<_>>()
+            .first()
+            .map(|data| *data.0)
+    }
+
     /// Check if a given Rect (a clicked area of 1x1), interacts with any known panels
     #[must_use]
     pub fn get_intersect_header(&self, rect: Rect) -> Option<Header> {

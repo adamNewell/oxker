@@ -301,33 +301,51 @@ impl super::View for MainView<'_> {
         }
 
         // Command confirmation dialog
-        if model.status.contains(&Status::CommandConfirm)
-            && let Some((command, container_id)) = self.gui_state.lock().get_command_confirm()
-        {
-            // Find container name from UIContainerState
-            let container_name = self
-                .container_state
-                .lock()
-                .get_container_items()
-                .iter()
-                .find(|c| c.id == container_id)
-                .map(|c| c.name.clone());
+        if model.status.contains(&Status::CommandConfirm) {
+            tracing::debug!("CommandConfirm status detected in render");
+            let command_info = self.gui_state.lock().get_command_confirm();
+            if let Some((command, container_id)) = command_info {
+                tracing::debug!(
+                    "Rendering confirmation modal for command {:?} on container {}",
+                    command,
+                    container_id.get()
+                );
+                // Find container name from UIContainerState
+                let container_name = self
+                    .container_state
+                    .lock()
+                    .get_container_items()
+                    .iter()
+                    .find(|c| c.id == container_id)
+                    .map(|c| c.name.clone());
 
-            if let Some(name) = container_name {
-                let confirm_props =
-                    crate::ui::components::panels::confirmation_modal::ConfirmationModalProps {
-                        command,
-                        container_id: container_id.get(),
-                        container_name: name.get(),
-                        theme,
-                        keymap: self.keymap,
-                        gui_state: self.gui_state,
-                    };
-                self.confirmation_modal
-                    .render(&confirm_props, frame.area(), frame);
+                if let Some(name) = container_name {
+                    tracing::debug!("Container name found: {}, rendering modal", name.get());
+                    let confirm_props =
+                        crate::ui::components::panels::confirmation_modal::ConfirmationModalProps {
+                            command,
+                            container_id: container_id.get(),
+                            container_name: name.get(),
+                            theme,
+                            keymap: self.keymap,
+                            gui_state: self.gui_state,
+                        };
+                    self.confirmation_modal
+                        .render(&confirm_props, frame.area(), frame);
+                    tracing::debug!("Modal render complete");
+                } else {
+                    tracing::warn!(
+                        "Container not found for ID {}, clearing confirmation",
+                        container_id.get()
+                    );
+                    // Container was deleted externally, clear the dialog
+                    self.gui_state.lock().set_command_confirm(None);
+                }
             } else {
-                // Container was deleted externally, clear the dialog
-                self.gui_state.lock().set_command_confirm(None);
+                // This can happen during cancellation - the status is still set but command data is cleared
+                tracing::debug!(
+                    "CommandConfirm status set but no command data available - likely cancellation in progress"
+                );
             }
         }
 

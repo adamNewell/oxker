@@ -15,7 +15,10 @@ mod command_mapper;
 mod message;
 
 use crate::handlers::UIContainerState;
-use crate::ui::{DeleteButton, GuiState, SelectablePanel, Status, Ui};
+use crate::ui::{
+    DeleteButton, GuiState, SelectablePanel, Status, Ui,
+    components::panels::confirmation_modal::ConfirmationButton,
+};
 use command_mapper::CommandMapper;
 pub use message::InputMessages;
 use oxker_core::{
@@ -66,9 +69,12 @@ impl InputHandler {
 
                     if contains(Status::DeleteConfirm) {
                         self.button_intersect(mouse_event).await;
+                    } else if contains(Status::CommandConfirm) {
+                        self.command_button_intersect(mouse_event).await;
                     } else if !contains(Status::Error)
                         | !contains(Status::Help)
                         | !contains(Status::DeleteConfirm)
+                        | !contains(Status::CommandConfirm)
                         | !contains(Status::Filter)
                     {
                         self.mouse_press(mouse_event, modifider).await;
@@ -260,13 +266,19 @@ impl InputHandler {
     fn enter_key(&self) {
         // This isn't great, just means you can't send docker commands before full initialization of the program
         let panel = self.gui_state.lock().get_selected_panel();
+        tracing::debug!("enter_key called, selected panel: {:?}", panel);
         if panel == SelectablePanel::Commands {
+            tracing::debug!("Commands panel is selected, showing confirmation modal");
             // Show confirmation modal instead of directly executing
             if let Err(e) = self.show_command_confirmation() {
                 tracing::error!("Failed to show command confirmation: {}", e);
                 self.gui_state.lock().status_push(Status::Error);
                 self.gui_state.lock().force_redraw();
+            } else {
+                tracing::debug!("Command confirmation modal should now be visible");
             }
+            // Force an immediate redraw to ensure the modal appears
+            self.gui_state.lock().force_redraw();
         }
     }
 
@@ -275,29 +287,47 @@ impl InputHandler {
         // Get selected container and command from UI state
         let (container_id, command) = {
             let ui_selection = self.gui_state.lock().get_ui_commands_selection();
+            tracing::debug!("UI commands selection index: {}", ui_selection);
+
             let container_state = self.container_state.lock();
             let container_id = container_state
                 .get_selected_container_id()
                 .ok_or_else(|| "No container selected".to_string())?;
+            tracing::debug!("Selected container ID: {}", container_id.get());
 
             let command = container_state
                 .docker_commands
                 .items
                 .get(ui_selection)
                 .ok_or_else(|| "No command selected".to_string())?;
+            tracing::debug!("Selected command: {:?}", command);
             (container_id, *command)
         };
 
         // Special handling for Delete command - use existing DeleteConfirm flow
         if command == oxker_core::DockerCommand::Delete {
+            tracing::debug!("Delete command detected, using DeleteConfirm flow");
             self.gui_state
                 .lock()
                 .set_delete_container(Some(container_id));
         } else {
             // Show the new confirmation modal for other commands
+            tracing::debug!(
+                "Setting command confirm for {:?} on container {}",
+                command,
+                container_id.get()
+            );
             self.gui_state
                 .lock()
                 .set_command_confirm(Some((command, container_id)));
+
+            // Verify the status was set
+            let status = self.gui_state.lock().get_status();
+            tracing::debug!("Status after setting command confirm: {:?}", status);
+            tracing::debug!(
+                "CommandConfirm status present: {}",
+                status.contains(&Status::CommandConfirm)
+            );
         }
 
         Ok(())
@@ -878,6 +908,23 @@ impl InputHandler {
                 match button {
                     DeleteButton::Confirm => self.confirm_delete().await,
                     DeleteButton::Cancel => self.clear_delete(),
+                }
+            }
+        }
+    }
+
+    /// Check if a button press interacts with the command confirmation modal buttons
+    async fn command_button_intersect(&self, mouse_event: MouseEvent) {
+        if mouse_event.kind == MouseEventKind::Down(MouseButton::Left) {
+            let intersect = self
+                .gui_state
+                .lock()
+                .get_intersect_confirm_button(Rect::new(mouse_event.column, mouse_event.row, 1, 1));
+
+            if let Some(button) = intersect {
+                match button {
+                    ConfirmationButton::Confirm => self.confirm_command().await,
+                    ConfirmationButton::Cancel => self.clear_command_confirm(),
                 }
             }
         }
