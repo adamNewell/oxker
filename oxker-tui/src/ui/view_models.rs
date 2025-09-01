@@ -154,7 +154,14 @@ impl FrameViewModel {
 
         // Prepare port view
         let port_view = selected_container_data.map(|container| {
-            let ports = container.ports.clone();
+            let mut ports = container.ports.clone();
+            // Sort ports by public port number (ascending), with None values at the end
+            ports.sort_by(|a, b| match (a.public, b.public) {
+                (Some(pa), Some(pb)) => pa.cmp(&pb),
+                (Some(_), None) => std::cmp::Ordering::Less,
+                (None, Some(_)) => std::cmp::Ordering::Greater,
+                (None, None) => a.private.cmp(&b.private), // Sort by private port if both public are None
+            });
             let max_lens = calculate_port_max_lens(&ports);
             PortView {
                 ports,
@@ -278,7 +285,8 @@ fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
         .iter()
         .map(|p| p.ip.map_or(0, |ip| ip.to_string().len()))
         .max()
-        .unwrap_or(0);
+        .unwrap_or(0)
+        .max(7);
     let max_private = ports
         .iter()
         .map(|p| p.private.to_string().len())
@@ -288,7 +296,8 @@ fn calculate_port_max_lens(ports: &[ContainerPorts]) -> (usize, usize, usize) {
         .iter()
         .map(|p| p.public.as_ref().map_or(0, |p| p.to_string().len()))
         .max()
-        .unwrap_or(0);
+        .unwrap_or(0)
+        .max(6);
 
     (max_ip, max_private, max_public)
 }
@@ -342,5 +351,213 @@ fn create_container_title(count: usize, selected: Option<usize>) -> String {
         format!("Containers {}/{}", idx + 1, count)
     } else {
         format!("Containers [{count}]")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use oxker_core::ContainerPorts;
+    use std::net::IpAddr;
+
+    #[test]
+    fn test_port_sorting_ascending_by_public_port() {
+        // Arrange: Create unsorted ports
+        let mut ports = [
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 80,
+                public: Some(8080),
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 443,
+                public: Some(443),
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 22,
+                public: Some(2222),
+            },
+        ];
+
+        // Act: Apply the same sorting logic
+        ports.sort_by(|a, b| match (a.public, b.public) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.private.cmp(&b.private),
+        });
+
+        // Assert: Verify ports are sorted by public port ascending
+        assert_eq!(ports[0].public, Some(443));
+        assert_eq!(ports[1].public, Some(2222));
+        assert_eq!(ports[2].public, Some(8080));
+    }
+
+    #[test]
+    fn test_port_sorting_none_public_ports_at_end() {
+        // Arrange: Mix of ports with and without public mappings
+        let mut ports = [
+            ContainerPorts {
+                ip: None,
+                private: 3000,
+                public: None,
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 80,
+                public: Some(8080),
+            },
+            ContainerPorts {
+                ip: None,
+                private: 5000,
+                public: None,
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 443,
+                public: Some(443),
+            },
+        ];
+
+        // Act: Apply sorting
+        ports.sort_by(|a, b| match (a.public, b.public) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.private.cmp(&b.private),
+        });
+
+        // Assert: Ports with public mappings come first, None values at end
+        assert_eq!(ports[0].public, Some(443));
+        assert_eq!(ports[1].public, Some(8080));
+        assert_eq!(ports[2].public, None);
+        assert_eq!(ports[2].private, 3000); // Sorted by private when both public are None
+        assert_eq!(ports[3].public, None);
+        assert_eq!(ports[3].private, 5000);
+    }
+
+    #[test]
+    fn test_port_sorting_stability_same_public_port() {
+        // Arrange: Ports with duplicate public port numbers (different protocols implied)
+        let mut ports = [
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 80,
+                public: Some(8080),
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 8080,
+                public: Some(8080), // Same public port
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 443,
+                public: Some(443),
+            },
+        ];
+
+        // Act: Apply sorting
+        ports.sort_by(|a, b| match (a.public, b.public) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.private.cmp(&b.private),
+        });
+
+        // Assert: Sort is stable - duplicates maintain relative order
+        assert_eq!(ports[0].public, Some(443));
+        assert_eq!(ports[1].public, Some(8080));
+        assert_eq!(ports[1].private, 80); // First 8080 port
+        assert_eq!(ports[2].public, Some(8080));
+        assert_eq!(ports[2].private, 8080); // Second 8080 port
+    }
+
+    #[test]
+    fn test_port_sorting_large_port_numbers() {
+        // Arrange: Test with very large port numbers
+        let mut ports = [
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 65535,
+                public: Some(65535),
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 1,
+                public: Some(1),
+            },
+            ContainerPorts {
+                ip: Some("0.0.0.0".parse::<IpAddr>().unwrap()),
+                private: 32768,
+                public: Some(32768),
+            },
+        ];
+
+        // Act: Apply sorting
+        ports.sort_by(|a, b| match (a.public, b.public) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.private.cmp(&b.private),
+        });
+
+        // Assert: Correct ascending order
+        assert_eq!(ports[0].public, Some(1));
+        assert_eq!(ports[1].public, Some(32768));
+        assert_eq!(ports[2].public, Some(65535));
+    }
+
+    #[test]
+    fn test_port_sorting_empty_list() {
+        // Arrange: Empty port list
+        let mut ports: Vec<ContainerPorts> = vec![];
+
+        // Act: Apply sorting (should not panic)
+        ports.sort_by(|a, b| match (a.public, b.public) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.private.cmp(&b.private),
+        });
+
+        // Assert: List remains empty
+        assert!(ports.is_empty());
+    }
+
+    #[test]
+    fn test_port_sorting_only_private_ports() {
+        // Arrange: Only private ports (no public mappings)
+        let mut ports = [
+            ContainerPorts {
+                ip: None,
+                private: 5000,
+                public: None,
+            },
+            ContainerPorts {
+                ip: None,
+                private: 3000,
+                public: None,
+            },
+            ContainerPorts {
+                ip: None,
+                private: 4000,
+                public: None,
+            },
+        ];
+
+        // Act: Apply sorting
+        ports.sort_by(|a, b| match (a.public, b.public) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => a.private.cmp(&b.private),
+        });
+
+        // Assert: Sorted by private port when all public are None
+        assert_eq!(ports[0].private, 3000);
+        assert_eq!(ports[1].private, 4000);
+        assert_eq!(ports[2].private, 5000);
     }
 }

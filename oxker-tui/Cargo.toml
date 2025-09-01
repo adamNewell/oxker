@@ -55,3 +55,7 @@ harness = false
 [[bench]]
 name = "simple_panel_bench"
 harness = false
+
+[[bench]]
+name = "port_sorting_bench"
+harness = false
