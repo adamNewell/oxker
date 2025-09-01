@@ -1420,6 +1420,7 @@ dependencies = [
  "futures-util",
  "insta",
  "jiff",
+ "once_cell",
  "oxker-core",
  "parking_lot",
  "ratatui",

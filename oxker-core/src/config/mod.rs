@@ -79,7 +79,7 @@ impl From<ConfigFile> for Config {
             show_timestamp: config_file.show_timestamp.unwrap_or(true),
             timezone: Self::parse_timezone(config_file.timezone),
             timestamp_format: Self::parse_timestamp_format(config_file.timestamp_format),
-            show_logs: config_file.show_logs.unwrap_or(true),
+            show_logs: config_file.show_logs.unwrap_or(false),
             debug_mode: false, // Config file doesn't support debug mode
         }
     }

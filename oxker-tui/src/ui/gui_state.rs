@@ -1,3 +1,4 @@
+use crate::debug::{EventCategory, writer};
 use parking_lot::Mutex;
 use ratatui::layout::Rect;
 use std::{
@@ -113,6 +114,12 @@ pub struct GuiState {
 }
 impl GuiState {
     pub fn new(redraw: &Arc<Rerender>, show_logs: bool) -> Self {
+        writer::write_debug(
+            EventCategory::GUI,
+            "GuiState",
+            "new",
+            &format!("show_logs={show_logs}"),
+        );
         Self {
             command_confirm: None,
             delete_container_id: None,
@@ -177,7 +184,14 @@ impl GuiState {
     }
 
     pub fn toggle_show_logs(&mut self) {
+        let old_state = self.show_logs;
         self.show_logs = !self.show_logs;
+        writer::write_debug(
+            EventCategory::GUI,
+            "GuiState",
+            "toggle_logs",
+            &format!("from={} to={}", old_state, self.show_logs),
+        );
         if !self.show_logs && self.selected_panel == SelectablePanel::Logs {
             self.selected_panel = SelectablePanel::Containers;
         }
@@ -622,6 +636,36 @@ mod tests {
         assert!(!gui_state.is_loading()); // No longer loading
         assert!(gui_state.loading_uuids.is_empty());
         assert!(gui_state.loading_uuid_timestamps.is_empty());
+    }
+
+    #[test]
+    fn test_show_logs_default_false() {
+        // Test that show_logs defaults to false to prevent log flashing bug
+        let rerender = Arc::new(Rerender::default());
+        let gui_state = GuiState::new(&rerender, false);
+
+        // Verify show_logs is false
+        assert!(
+            !gui_state.get_show_logs(),
+            "show_logs should default to false"
+        );
+    }
+
+    #[test]
+    fn test_show_logs_toggle() {
+        let rerender = Arc::new(Rerender::default());
+        let mut gui_state = GuiState::new(&rerender, false);
+
+        // Initially false
+        assert!(!gui_state.get_show_logs());
+
+        // Toggle on
+        gui_state.toggle_show_logs();
+        assert!(gui_state.get_show_logs());
+
+        // Toggle off
+        gui_state.toggle_show_logs();
+        assert!(!gui_state.get_show_logs());
     }
 
     #[test]

@@ -131,7 +131,20 @@ impl<'p> Component<'p> for LogsPanel {
         } else {
             let logs = &props.view_model.log_view.logs;
 
-            if logs.is_empty() {
+            if props.view_model.log_view.is_loading {
+                // Show loading animation while logs are being fetched
+                let mut paragraph =
+                    Paragraph::new(format!("loading logs {}", props.view_model.loading_icon))
+                        .block(block)
+                        .alignment(Alignment::Center);
+
+                if !props.view_model.color_logs {
+                    paragraph = paragraph
+                        .style(Style::default().fg(props.theme.logs.text.into_ratatui_color()));
+                }
+
+                frame.render_widget(paragraph, area);
+            } else if logs.is_empty() {
                 // No logs to display
                 let mut paragraph = Paragraph::new("no logs found")
                     .block(block)

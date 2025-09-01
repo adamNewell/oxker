@@ -383,20 +383,28 @@ impl InputHandler {
         let selected_panel = self.gui_state.lock().get_selected_panel();
         match selected_panel {
             SelectablePanel::Containers => {
+                // Store the previous container ID before navigating
+                let prev_id = self.container_state.lock().get_selected_container_id();
+
                 self.container_state.lock().first_container();
                 self.gui_state.lock().force_redraw();
-                // Reset UI logs position when switching containers
-                self.gui_state.lock().set_ui_logs_position(0);
-                // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
-                {
-                    let core_handle = self.core_handle.clone();
-                    let id = container_id.get().to_string();
-                    tokio::spawn(async move {
-                        let _ = core_handle
-                            .execute_command(CoreCommand::RefreshLogs(id))
-                            .await;
-                    });
+
+                // Get the new container ID after navigation
+                let new_id = self.container_state.lock().get_selected_container_id();
+
+                // Only reset UI logs position when we actually switched containers
+                if prev_id != new_id {
+                    self.gui_state.lock().set_ui_logs_position(0);
+                    // Trigger log refresh for newly selected container
+                    if let Some(container_id) = new_id {
+                        let core_handle = self.core_handle.clone();
+                        let id = container_id.get().to_string();
+                        tokio::spawn(async move {
+                            let _ = core_handle
+                                .execute_command(CoreCommand::RefreshLogs(id))
+                                .await;
+                        });
+                    }
                 }
             }
             SelectablePanel::Logs => {
@@ -413,20 +421,28 @@ impl InputHandler {
         let selected_panel = self.gui_state.lock().get_selected_panel();
         match selected_panel {
             SelectablePanel::Containers => {
+                // Store the previous container ID before navigating
+                let prev_id = self.container_state.lock().get_selected_container_id();
+
                 self.container_state.lock().last_container();
                 self.gui_state.lock().force_redraw();
-                // Reset UI logs position when switching containers
-                self.gui_state.lock().set_ui_logs_position(0);
-                // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
-                {
-                    let core_handle = self.core_handle.clone();
-                    let id = container_id.get().to_string();
-                    tokio::spawn(async move {
-                        let _ = core_handle
-                            .execute_command(CoreCommand::RefreshLogs(id))
-                            .await;
-                    });
+
+                // Get the new container ID after navigation
+                let new_id = self.container_state.lock().get_selected_container_id();
+
+                // Only reset UI logs position when we actually switched containers
+                if prev_id != new_id {
+                    self.gui_state.lock().set_ui_logs_position(0);
+                    // Trigger log refresh for newly selected container
+                    if let Some(container_id) = new_id {
+                        let core_handle = self.core_handle.clone();
+                        let id = container_id.get().to_string();
+                        tokio::spawn(async move {
+                            let _ = core_handle
+                                .execute_command(CoreCommand::RefreshLogs(id))
+                                .await;
+                        });
+                    }
                 }
             }
             SelectablePanel::Logs => {
@@ -966,22 +982,30 @@ impl InputHandler {
         let selected_panel = self.gui_state.lock().get_selected_panel();
         match selected_panel {
             SelectablePanel::Containers => {
+                // Store the previous container ID before navigating
+                let prev_id = self.container_state.lock().get_selected_container_id();
+
                 for _ in 0..self.get_modifier_total(modifier) {
                     self.container_state.lock().next_container();
                 }
                 self.gui_state.lock().force_redraw();
-                // Reset UI logs position when switching containers
-                self.gui_state.lock().set_ui_logs_position(0);
-                // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
-                {
-                    let core_handle = self.core_handle.clone();
-                    let id = container_id.get().to_string();
-                    tokio::spawn(async move {
-                        let _ = core_handle
-                            .execute_command(CoreCommand::RefreshLogs(id))
-                            .await;
-                    });
+
+                // Get the new container ID after navigation
+                let new_id = self.container_state.lock().get_selected_container_id();
+
+                // Only reset UI logs position when we actually switched containers
+                if prev_id != new_id {
+                    self.gui_state.lock().set_ui_logs_position(0);
+                    // Trigger log refresh for newly selected container
+                    if let Some(container_id) = new_id {
+                        let core_handle = self.core_handle.clone();
+                        let id = container_id.get().to_string();
+                        tokio::spawn(async move {
+                            let _ = core_handle
+                                .execute_command(CoreCommand::RefreshLogs(id))
+                                .await;
+                        });
+                    }
                 }
             }
             SelectablePanel::Logs => {
@@ -1002,22 +1026,30 @@ impl InputHandler {
         let selected_panel = self.gui_state.lock().get_selected_panel();
         match selected_panel {
             SelectablePanel::Containers => {
+                // Store the previous container ID before navigating
+                let prev_id = self.container_state.lock().get_selected_container_id();
+
                 for _ in 0..self.get_modifier_total(modifier) {
                     self.container_state.lock().previous_container();
                 }
                 self.gui_state.lock().force_redraw();
-                // Reset UI logs position when switching containers
-                self.gui_state.lock().set_ui_logs_position(0);
-                // Trigger log refresh for newly selected container
-                if let Some(container_id) = self.container_state.lock().get_selected_container_id()
-                {
-                    let core_handle = self.core_handle.clone();
-                    let id = container_id.get().to_string();
-                    tokio::spawn(async move {
-                        let _ = core_handle
-                            .execute_command(CoreCommand::RefreshLogs(id))
-                            .await;
-                    });
+
+                // Get the new container ID after navigation
+                let new_id = self.container_state.lock().get_selected_container_id();
+
+                // Only reset UI logs position when we actually switched containers
+                if prev_id != new_id {
+                    self.gui_state.lock().set_ui_logs_position(0);
+                    // Trigger log refresh for newly selected container
+                    if let Some(container_id) = new_id {
+                        let core_handle = self.core_handle.clone();
+                        let id = container_id.get().to_string();
+                        tokio::spawn(async move {
+                            let _ = core_handle
+                                .execute_command(CoreCommand::RefreshLogs(id))
+                                .await;
+                        });
+                    }
                 }
             }
             SelectablePanel::Logs => {

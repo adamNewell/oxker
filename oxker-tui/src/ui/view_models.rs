@@ -44,6 +44,7 @@ pub struct PortView {
 pub struct LogView {
     pub logs: Vec<String>,
     pub title: String,
+    pub is_loading: bool,
 }
 
 /// Commands view data
@@ -89,6 +90,13 @@ impl FrameViewModel {
         _colors: AppColors,
         screen_width: u16,
     ) -> Self {
+        use crate::debug::{EventCategory, writer};
+        writer::write_debug(
+            EventCategory::State,
+            "FrameViewModel",
+            "from_state",
+            "Creating new view model from state",
+        );
         // Convert containers to view models
         let containers: Vec<ContainerView> = ui_state
             .get_container_items()
@@ -171,11 +179,19 @@ impl FrameViewModel {
         });
 
         // Prepare log view
+        let logs_collected: Vec<String> = ui_state.logs.iter().cloned().collect();
+        writer::write_debug(
+            EventCategory::Logs,
+            "FrameViewModel",
+            "from_state",
+            &format!("Collecting logs: count={}", logs_collected.len()),
+        );
         let log_view = LogView {
-            logs: ui_state.logs.iter().cloned().collect(),
+            logs: logs_collected,
             title: selected_container_data.map_or_else(String::new, |c| {
                 format!("Logs - {} - {}", c.name.get(), c.image.get())
             }),
+            is_loading: ui_state.logs_loading,
         };
 
         // Prepare commands view
@@ -264,6 +280,7 @@ impl Default for FrameViewModel {
             log_view: LogView {
                 logs: Vec::new(),
                 title: String::new(),
+                is_loading: false,
             },
             log_height: 4,
             show_logs: true,

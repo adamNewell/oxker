@@ -14,6 +14,7 @@ use tracing::{Level, error, info};
 // Import from oxker-core
 use oxker_core::{Config, CoreHandle, EventBus};
 
+use oxker_tui::debug::{EventCategory, writer};
 use oxker_tui::handlers::UIEventHandler;
 use oxker_tui::terminal_guard::install_panic_handler;
 use oxker_tui::ui::{GuiState, Rerender, Ui};
@@ -68,6 +69,8 @@ fn handler_init(
 async fn main() {
     setup_tracing();
 
+    writer::init_debug_file();
+
     // Install enhanced panic handler that properly restores terminal state
     install_panic_handler();
     let config = Config::new();
@@ -79,6 +82,12 @@ async fn main() {
     // Initialize CoreHandle with Docker connection
     let core_handle = core_init(event_bus, &config);
 
+    writer::write_debug(
+        EventCategory::System,
+        "main",
+        "init",
+        &format!("config.show_logs={}", config.show_logs),
+    );
     let gui_state = Arc::new(Mutex::new(GuiState::new(&redraw, config.show_logs)));
     let is_running = Arc::new(AtomicBool::new(true));
 
@@ -129,6 +138,15 @@ async fn main() {
 
         // Trigger log refresh for the initially selected container
         let container_id = container_state.lock().get_selected_container_id();
+        writer::write_debug(
+            EventCategory::Logs,
+            "main",
+            "initial_refresh",
+            &format!(
+                "container_id={:?}",
+                container_id.as_ref().map(oxker_core::ContainerId::get)
+            ),
+        );
         if let Some(container_id) = container_id
             && let Err(e) = core_handle
                 .execute_command(oxker_core::CoreCommand::RefreshLogs(
@@ -212,7 +230,7 @@ pub mod tests {
             docker_interval_ms: 1000,
             keymap: Keymap::new(),
             network_interface: None,
-            show_logs: true,
+            show_logs: false,
             show_timestamp: false,
             timestamp_format: String::new(),
             timezone: None,

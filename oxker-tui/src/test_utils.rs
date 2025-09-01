@@ -37,7 +37,7 @@ pub mod test_utils {
                     docker_interval_ms: 1000,
                     keymap: Keymap::new(),
                     network_interface: None,
-                    show_logs: true,
+                    show_logs: false,
                     show_timestamp: false,
                     timestamp_format: String::new(),
                     timezone: None,
@@ -375,7 +375,7 @@ pub mod test_utils {
             network_interface: None,
             timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             show_timestamp: false,
-            show_logs: true,
+            show_logs: false,
             timezone: None,
             debug_mode: false,
         }

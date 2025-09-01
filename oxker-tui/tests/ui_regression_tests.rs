@@ -4,13 +4,17 @@
 
 use insta::{Settings, assert_snapshot};
 use oxker_core::{AppColors, FilterBy, Keymap};
+use oxker_tui::handlers::UIContainerState;
 use oxker_tui::ui::components::panels::{
     error::ErrorPanelProps, filter::FilterPanelProps, help::HelpPanelProps,
 };
 use oxker_tui::ui::components::{Component, ErrorPanel, FilterPanel, HelpPanel};
+use oxker_tui::ui::{FrameViewModel, GuiState, Rerender};
+use parking_lot::Mutex;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::widgets::Block;
+use std::sync::Arc;
 
 /// Helper to render a component and capture its output as a string
 fn capture_component_output<'a, C>(
@@ -194,4 +198,70 @@ fn test_block_rendering_regression() {
 
     let output = terminal_buffer_to_string(&terminal, 20, 5);
     assert_snapshot!("basic_block", output);
+}
+
+// Loading state management tests
+#[test]
+fn test_loading_state_on_container_switch() {
+    let mut ui_state = UIContainerState::new();
+
+    // Add two containers
+    let containers = vec![
+        oxker_core::events::types::ContainerItem {
+            id: "container-0".to_string(),
+            name: "first".to_string(),
+            image: "test:latest".to_string(),
+            state: "running".to_string(),
+            status: "Up 5 minutes".to_string(),
+            ports: vec![],
+        },
+        oxker_core::events::types::ContainerItem {
+            id: "container-1".to_string(),
+            name: "second".to_string(),
+            image: "test:latest".to_string(),
+            state: "running".to_string(),
+            status: "Up 10 minutes".to_string(),
+            ports: vec![],
+        },
+    ];
+    ui_state.update_containers(containers);
+
+    // Start with first container
+    ui_state.first_container();
+    ui_state.logs_loading = false;
+
+    // Switch to second container
+    ui_state.next_container();
+
+    // Verify loading state is set
+    assert!(ui_state.logs_loading, "Should show loading after switch");
+
+    // Add logs to clear loading state
+    ui_state.add_logs(
+        "container-1",
+        vec![oxker_core::events::types::LogLine {
+            container_id: "container-1".to_string(),
+            timestamp: "2024-01-01T10:00:00Z".to_string(),
+            message: "New log".to_string(),
+        }],
+    );
+
+    assert!(
+        !ui_state.logs_loading,
+        "Loading should clear after logs arrive"
+    );
+}
+
+#[test]
+fn test_default_show_logs_is_false() {
+    let rerender = Arc::new(Rerender::default());
+    let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, false)));
+    let ui_state = UIContainerState::new();
+
+    // Create view model to check default state
+    let view_model =
+        FrameViewModel::from_state(&ui_state, &gui_state.lock(), AppColors::new(), 120);
+
+    // Verify logs are not shown by default (prevents flashing)
+    assert!(!view_model.show_logs, "Logs should not be shown by default");
 }

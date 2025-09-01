@@ -295,6 +295,119 @@ fn test_logs_sticky_bottom_behavior() {
     assert_eq!(gui_state.lock().unwrap().get_ui_logs_position(), 9);
 }
 
+// Log persistence tests - ensure logs are handled correctly during updates
+#[test]
+fn test_empty_log_update_preserves_logs() {
+    let mut ui_state = UIContainerState::new();
+
+    // Add a container
+    let containers = vec![oxker_core::events::types::ContainerItem {
+        id: "test-container".to_string(),
+        name: "test".to_string(),
+        image: "test:latest".to_string(),
+        state: "running".to_string(),
+        status: "Up 5 minutes".to_string(),
+        ports: vec![],
+    }];
+    ui_state.update_containers(containers);
+
+    // Add initial logs
+    ui_state.add_logs(
+        "test-container",
+        vec![
+            oxker_core::events::types::LogLine {
+                container_id: "test-container".to_string(),
+                timestamp: "2024-01-01T10:00:00Z".to_string(),
+                message: "Log line 1".to_string(),
+            },
+            oxker_core::events::types::LogLine {
+                container_id: "test-container".to_string(),
+                timestamp: "2024-01-01T10:00:01Z".to_string(),
+                message: "Log line 2".to_string(),
+            },
+        ],
+    );
+
+    let logs_before = ui_state.get_logs();
+    assert_eq!(logs_before.len(), 2, "Should have 2 initial logs");
+
+    // Send empty log update
+    ui_state.add_logs("test-container", vec![]);
+
+    // Verify logs are preserved
+    let logs_after = ui_state.get_logs();
+    assert_eq!(
+        logs_after.len(),
+        2,
+        "Logs should be preserved after empty update"
+    );
+    assert_eq!(logs_after[0], "Log line 1");
+    assert_eq!(logs_after[1], "Log line 2");
+}
+
+#[test]
+fn test_log_buffer_size_limit() {
+    let mut ui_state = UIContainerState::new();
+
+    // Add a container
+    let containers = vec![oxker_core::events::types::ContainerItem {
+        id: "test-container".to_string(),
+        name: "test".to_string(),
+        image: "test:latest".to_string(),
+        state: "running".to_string(),
+        status: "Up 5 minutes".to_string(),
+        ports: vec![],
+    }];
+    ui_state.update_containers(containers);
+
+    // Add many logs to test buffer limit
+    let mut logs = vec![];
+    for i in 0..10005 {
+        logs.push(oxker_core::events::types::LogLine {
+            container_id: "test-container".to_string(),
+            timestamp: "2024-01-01T10:00:00Z".to_string(),
+            message: format!("Log {i}"),
+        });
+    }
+
+    ui_state.add_logs("test-container", logs);
+
+    // Buffer should be limited to 10000
+    let current_logs = ui_state.get_logs();
+    assert!(
+        current_logs.len() <= 10000,
+        "Log buffer should be limited to 10000"
+    );
+
+    // Oldest logs should be removed
+    assert_eq!(current_logs[0], "Log 5"); // First 5 should be removed
+}
+
+#[test]
+fn test_loading_state_cleared_on_empty_update() {
+    let mut ui_state = UIContainerState::new();
+
+    let containers = vec![oxker_core::events::types::ContainerItem {
+        id: "test-container".to_string(),
+        name: "test".to_string(),
+        image: "test:latest".to_string(),
+        state: "running".to_string(),
+        status: "Up 5 minutes".to_string(),
+        ports: vec![],
+    }];
+    ui_state.update_containers(containers);
+
+    ui_state.logs_loading = true;
+
+    // Send empty log update
+    ui_state.add_logs("test-container", vec![]);
+
+    assert!(
+        !ui_state.logs_loading,
+        "Loading should clear on any update including empty"
+    );
+}
+
 #[test]
 fn test_filter_field_navigation() {
     let mut ui_state = UIContainerState::new();

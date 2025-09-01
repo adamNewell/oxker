@@ -29,6 +29,8 @@ pub struct UIContainerState {
     pub docker_commands: StatefulList<DockerCommand>,
     /// Logs for the selected container
     pub logs: VecDeque<String>,
+    /// Whether logs are currently being loaded for the selected container
+    pub logs_loading: bool,
     /// Filter term for container list
     pub filter_term: String,
     /// Field to filter by
@@ -61,6 +63,7 @@ impl UIContainerState {
                 DockerCommand::Delete,
             ]),
             logs: VecDeque::new(),
+            logs_loading: false,
             filter_term: String::new(),
             filter_by: Header::Id, // Using Id to represent "All" - default filter
             sort_header: Some(Header::Name), // Default sort by name
@@ -259,6 +262,8 @@ impl UIContainerState {
 
     /// Add logs for a container
     pub fn add_logs(&mut self, container_id: &str, logs: Vec<LogLine>) {
+        use crate::debug::{EventCategory, writer};
+
         // Only add logs if this is the selected container
         if let Some(selected) = self
             .containers
@@ -267,10 +272,24 @@ impl UIContainerState {
             .and_then(|idx| self.containers.items.get(idx))
             && selected.id.get() == container_id
         {
-            // If logs are empty, it means the container has no logs to show
-            if logs.is_empty() {
-                self.logs.clear();
-            } else {
+            writer::write_debug(
+                EventCategory::Logs,
+                "UIContainerState",
+                "add_logs",
+                &format!(
+                    "Adding logs for {}: new_count={}, existing_count={}",
+                    container_id,
+                    logs.len(),
+                    self.logs.len()
+                ),
+            );
+
+            // Mark logs as loaded once we receive any log update (even empty)
+            self.logs_loading = false;
+
+            // Only process non-empty log updates
+            // Empty updates shouldn't clear existing logs - they just mean no new logs
+            if !logs.is_empty() {
                 for log in logs {
                     self.logs.push_back(log.message);
                     // Keep log buffer reasonable size
@@ -309,8 +328,15 @@ impl UIContainerState {
     }
 
     pub fn next_container(&mut self) {
+        let prev_id = self.get_selected_container_id();
         self.containers.next();
-        self.clear_logs();
+        let new_id = self.get_selected_container_id();
+
+        // Only clear logs if we switched to a different container
+        if prev_id != new_id {
+            self.clear_logs();
+            self.logs_loading = true; // Mark logs as loading for the new container
+        }
         self.update_docker_commands();
         self.increment_version();
     }
@@ -349,22 +375,43 @@ impl UIContainerState {
     }
 
     pub fn previous_container(&mut self) {
+        let prev_id = self.get_selected_container_id();
         self.containers.previous();
-        self.clear_logs();
+        let new_id = self.get_selected_container_id();
+
+        // Only clear logs if we switched to a different container
+        if prev_id != new_id {
+            self.clear_logs();
+            self.logs_loading = true; // Mark logs as loading for the new container
+        }
         self.update_docker_commands();
         self.increment_version();
     }
 
     pub fn first_container(&mut self) {
+        let prev_id = self.get_selected_container_id();
         self.containers.start();
-        self.clear_logs();
+        let new_id = self.get_selected_container_id();
+
+        // Only clear logs if we switched to a different container
+        if prev_id != new_id {
+            self.clear_logs();
+            self.logs_loading = true; // Mark logs as loading for the new container
+        }
         self.update_docker_commands();
         self.increment_version();
     }
 
     pub fn last_container(&mut self) {
+        let prev_id = self.get_selected_container_id();
         self.containers.end();
-        self.clear_logs();
+        let new_id = self.get_selected_container_id();
+
+        // Only clear logs if we switched to a different container
+        if prev_id != new_id {
+            self.clear_logs();
+            self.logs_loading = true; // Mark logs as loading for the new container
+        }
         self.update_docker_commands();
         self.increment_version();
     }
@@ -380,6 +427,13 @@ impl UIContainerState {
     }
 
     pub fn clear_logs(&mut self) {
+        use crate::debug::{EventCategory, writer};
+        writer::write_debug(
+            EventCategory::Logs,
+            "UIContainerState",
+            "clear_logs",
+            &format!("Clearing {} logs", self.logs.len()),
+        );
         self.logs.clear();
     }
 

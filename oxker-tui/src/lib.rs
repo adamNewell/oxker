@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod debug;
 pub mod handlers;
 pub mod input_handler;
 pub mod key_conversion;

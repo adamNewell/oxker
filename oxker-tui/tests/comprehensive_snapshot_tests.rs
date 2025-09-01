@@ -366,6 +366,7 @@ fn test_logs_panel_snapshots() {
     view_model.log_view = LogView {
         logs: vec![],
         title: String::new(),
+        is_loading: false,
     };
 
     let props = LogsPanelProps {
@@ -389,6 +390,7 @@ fn test_logs_panel_snapshots() {
     view_model.log_view = LogView {
         logs,
         title: "Container Logs".to_string(),
+        is_loading: false,
     };
 
     let props = LogsPanelProps {
@@ -410,6 +412,7 @@ fn test_logs_panel_snapshots() {
     view_model.log_view = LogView {
         logs: vec!["Container stopped.".to_string()],
         title: "Container Logs".to_string(),
+        is_loading: false,
     };
 
     let props = LogsPanelProps {
@@ -828,6 +831,7 @@ fn test_combined_ui_layouts() {
                     "[10:00:02] Ready to accept connections".to_string(),
                 ],
                 title: "Container Logs".to_string(),
+                is_loading: false,
             };
 
             logs_panel.render(

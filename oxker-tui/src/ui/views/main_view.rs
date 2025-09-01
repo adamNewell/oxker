@@ -1,15 +1,18 @@
 //! Main view that orchestrates the entire UI layout
 
-use crate::ui::{
-    FrameViewModel, GuiState, Status,
-    components::{
-        Component,
-        panels::{
-            ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DebugPanel,
-            DeleteConfirmPanel, ErrorPanel, FilterPanel, HeadersPanel, HelpPanel, LogsPanel,
-            PortsPanel,
+use crate::{
+    debug::{EventCategory, writer},
+    ui::{
+        FrameViewModel, GuiState, Status,
+        components::{
+            Component,
+            panels::{
+                ChartsPanel, CommandsPanel, ConfirmationModal, ContainersPanel, DebugPanel,
+                DeleteConfirmPanel, ErrorPanel, FilterPanel, HeadersPanel, HelpPanel, LogsPanel,
+                PortsPanel,
+            },
+            widgets::{InfoBox, LoadingIndicator},
         },
-        widgets::{InfoBox, LoadingIndicator},
     },
 };
 use oxker_core::{Config, Keymap};
@@ -201,6 +204,16 @@ impl super::View for MainView<'_> {
                 .render(&containers_props, containers_commands[0], frame);
 
             if model.show_logs && containers_logs_section.len() > 1 {
+                writer::write_debug(
+                    EventCategory::Render,
+                    "MainView",
+                    "render_logs",
+                    &format!(
+                        "show_logs={} log_count={}",
+                        model.show_logs,
+                        model.log_view.logs.len()
+                    ),
+                );
                 if self.gui_state.lock().is_debug_mode_enabled() {
                     // In debug mode, split logs section horizontally
                     let logs_debug_split =

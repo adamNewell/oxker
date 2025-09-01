@@ -61,7 +61,7 @@ impl MockCoreHandle {
             network_interface: None,
             timestamp_format: "HH:MM:SS.NNNNN dd-mm-yyyy".to_owned(),
             show_timestamp: false,
-            show_logs: true,
+            show_logs: false,
             timezone: None,
             debug_mode: false,
         }
