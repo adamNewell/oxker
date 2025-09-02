@@ -30,8 +30,10 @@ use crate::{
         types::{CoreEvent, LogLine, Stats},
     },
 };
+mod event_stream;
 mod message;
 mod network;
+pub use event_stream::{DockerEventHandler, EventMetrics, EventMetricsSnapshot};
 pub use message::DockerMessage;
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
