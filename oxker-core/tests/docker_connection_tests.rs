@@ -22,6 +22,8 @@ const fn gen_test_config() -> Config {
         timestamp_format: String::new(),
         show_logs: true,
         debug_mode: false,
+        event_driven_mode: false,
+        full_sync_interval_ms: 60_000,
     }
 }
 

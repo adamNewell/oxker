@@ -21,6 +21,8 @@ fn create_test_config(network_interface: Option<String>) -> Config {
         timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
         show_logs: true,
         debug_mode: false,
+        event_driven_mode: false,
+        full_sync_interval_ms: 60_000,
     }
 }
 

@@ -17,7 +17,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
 };
-use tracing::info;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -79,6 +79,10 @@ pub struct DockerData {
     network_detector: Arc<Mutex<network::NetworkInterfaceDetector>>,
     receiver: Receiver<DockerMessage>,
     spawns: Arc<Mutex<HashMap<SpawnId, JoinHandle<()>>>>,
+    #[allow(dead_code)]
+    event_handler: Option<Arc<DockerEventHandler>>,
+    last_full_sync: Arc<Mutex<std::time::Instant>>,
+    container_tracker: Arc<Mutex<std::collections::HashSet<String>>>,
 }
 
 impl DockerData {
@@ -262,10 +266,16 @@ impl DockerData {
             .await
             .unwrap_or_default();
 
+        // Track container IDs for validation
+        self.container_tracker.lock().clear();
+
         let output = containers
             .into_iter()
             .filter_map(|f| match f.id {
-                Some(_) => {
+                Some(ref id) => {
+                    // Add to tracker
+                    self.container_tracker.lock().insert(id.clone());
+
                     if self.config.in_container
                         && f.command
                             .as_ref()
@@ -472,6 +482,131 @@ impl DockerData {
         self.update_everything().await;
     }
 
+    /// Periodic full sync task for event-driven mode
+    fn start_periodic_sync(&self, docker_tx: Sender<DockerMessage>) -> Option<JoinHandle<()>> {
+        if !self.config.event_driven_mode {
+            return None;
+        }
+
+        let sync_interval = std::time::Duration::from_millis(u64::from(
+            self.config.full_sync_interval_ms.clamp(30_000, 300_000),
+        ));
+
+        info!(
+            "Starting periodic full sync with interval: {:?}",
+            sync_interval
+        );
+
+        Some(tokio::spawn(async move {
+            let mut interval = tokio::time::interval(sync_interval);
+            loop {
+                interval.tick().await;
+                if docker_tx.send(DockerMessage::FullSync).await.is_err() {
+                    break;
+                }
+            }
+        }))
+    }
+
+    /// Perform a full container list sync
+    async fn perform_full_sync(&self) {
+        info!("Performing full container list sync");
+        let start = std::time::Instant::now();
+
+        // Get containers before sync for comparison
+        let before_count = self.container_tracker.lock().len();
+
+        self.update_all_containers().await;
+        *self.last_full_sync.lock() = std::time::Instant::now();
+
+        // Validate container tracking
+        let after_count = self.container_tracker.lock().len();
+        let sync_duration = start.elapsed();
+
+        // Log metrics
+        let _ = self
+            .event_bus
+            .publish(CoreEvent::DebugInfo {
+                category: "Sync".to_string(),
+                message: {
+                    let delta = if after_count >= before_count {
+                        format!("+{}", after_count - before_count)
+                    } else {
+                        format!("-{}", before_count - after_count)
+                    };
+                    format!(
+                        "Full sync completed: {after_count} containers (Δ{delta}), took {sync_duration:?}"
+                    )
+                },
+                metadata: Some(format!("before={before_count}, after={after_count}")),
+            })
+            .await;
+
+        // Check for consistency
+        self.validate_container_consistency().await;
+    }
+
+    /// Validate that tracked containers match actual containers
+    async fn validate_container_consistency(&self) {
+        let tracked = self.container_tracker.lock().clone();
+        let actual_containers = self
+            .docker
+            .list_containers(Some(bollard::query_parameters::ListContainersOptions {
+                all: true,
+                ..Default::default()
+            }))
+            .await
+            .unwrap_or_default();
+
+        let actual_ids: std::collections::HashSet<String> = actual_containers
+            .iter()
+            .filter_map(|c| c.id.clone())
+            .collect();
+
+        // Check for missed containers
+        let missed: Vec<_> = actual_ids.difference(&tracked).cloned().collect();
+        let phantom: Vec<_> = tracked.difference(&actual_ids).cloned().collect();
+
+        if !missed.is_empty() {
+            warn!(
+                "Container tracking missed {} containers: {:?}",
+                missed.len(),
+                missed
+            );
+            let _ = self
+                .event_bus
+                .publish(CoreEvent::DebugInfo {
+                    category: "Validation".to_string(),
+                    message: format!("Missed {} containers", missed.len()),
+                    metadata: Some(format!("{missed:?}")),
+                })
+                .await;
+        }
+
+        if !phantom.is_empty() {
+            warn!(
+                "Container tracking has {} phantom containers: {:?}",
+                phantom.len(),
+                phantom
+            );
+            let _ = self
+                .event_bus
+                .publish(CoreEvent::DebugInfo {
+                    category: "Validation".to_string(),
+                    message: format!("Phantom {} containers", phantom.len()),
+                    metadata: Some(format!("{phantom:?}")),
+                })
+                .await;
+        }
+
+        if missed.is_empty() && phantom.is_empty() {
+            debug!(
+                "Container tracking validation passed: {} containers",
+                tracked.len()
+            );
+        }
+    }
+
     /// Handle incoming messages, container controls & all container information update
     /// Spawn Docker commands off into own thread
     async fn message_handler(&mut self) {
@@ -487,7 +622,46 @@ impl DockerData {
                 DockerMessage::Exec(docker_tx) => {
                     docker_tx.send(Arc::clone(&self.docker)).ok();
                 }
-                DockerMessage::Update => self.update_everything().await,
+                DockerMessage::Update => {
+                    if self.config.event_driven_mode {
+                        // In event-driven mode, only update stats and logs
+                        if let Some(container) = self.app_data.lock().get_selected_container() {
+                            let last_updated = container.last_updated;
+                            let spawn_id = SpawnId::Log(container.id.clone());
+                            // Only spawn if not already spawned with a given id/binate pair
+                            if let std::collections::hash_map::Entry::Vacant(spawns) =
+                                self.spawns.lock().entry(spawn_id)
+                            {
+                                spawns.insert(tokio::spawn(Self::update_log(
+                                    Arc::clone(&self.app_data),
+                                    Arc::clone(&self.docker),
+                                    container.id.clone(),
+                                    last_updated,
+                                    Arc::clone(&self.spawns),
+                                    self.config.show_std_err,
+                                    Arc::clone(&self.event_bus),
+                                )));
+                            }
+                        }
+                        self.update_all_container_stats();
+                    } else {
+                        // In polling mode, update everything
+                        self.update_everything().await;
+                    }
+                }
+                DockerMessage::EventUpdate => {
+                    // Handle event-driven container list update
+                    if self.config.event_driven_mode {
+                        info!("Processing event-driven container list update");
+                        self.update_all_containers().await;
+                    }
+                }
+                DockerMessage::FullSync => {
+                    // Perform full sync (event-driven mode)
+                    if self.config.event_driven_mode {
+                        self.perform_full_sync().await;
+                    }
+                }
                 DockerMessage::RefreshLogs(container_id) => {
                     // Fetch logs for the specified container without changing selection
                     let container_id_obj = ContainerId::from(container_id.as_str());
@@ -536,11 +710,19 @@ impl DockerData {
     }
 
     /// Send an update message every x ms, where x is the args.docker_interval
-    fn heartbeat(config: &Config, docker_tx: Sender<DockerMessage>) -> JoinHandle<()> {
+    /// In event-driven mode, this is kept commented for rollback capability
+    fn heartbeat(config: &Config, docker_tx: Sender<DockerMessage>) -> Option<JoinHandle<()>> {
+        // If event-driven mode is enabled, don't start the polling heartbeat
+        if config.event_driven_mode {
+            info!("Event-driven mode enabled - polling heartbeat disabled");
+            return None;
+        }
+
+        // Original polling implementation - kept for rollback capability
         let update_duration =
             std::time::Duration::from_millis(u64::from(config.docker_interval_ms));
         let mut now = std::time::Instant::now();
-        tokio::spawn(async move {
+        Some(tokio::spawn(async move {
             loop {
                 if docker_tx.send(DockerMessage::Update).await.is_err() {
                     // Channel closed, exit heartbeat
@@ -551,7 +733,7 @@ impl DockerData {
                 }
                 now = std::time::Instant::now();
             }
-        })
+        }))
     }
 
     /// Initialise self, and start the message receiving loop
@@ -564,22 +746,79 @@ impl DockerData {
     ) {
         let args = app_data.lock().config.clone();
         if app_data.lock().get_error().is_none() {
+            // Create event handler if in event-driven mode
+            let event_handler = if args.event_driven_mode {
+                info!("Initializing event-driven mode");
+                // EventBus needs to be dereferenced from Arc
+                let (event_bus_for_handler, _) = EventBus::new(100);
+                let handler = Arc::new(DockerEventHandler::new(
+                    docker.clone(),
+                    event_bus_for_handler,
+                    std::time::Duration::from_secs(5),
+                ));
+
+                // Start event stream in background
+                let docker_tx_clone = docker_tx.clone();
+                let docker_clone = docker.clone();
+                tokio::spawn(async move {
+                    // Connect event stream to message handler
+                    let (local_bus, mut rx) = EventBus::new(100);
+                    let stream_handler = DockerEventHandler::new(
+                        docker_clone,
+                        local_bus,
+                        std::time::Duration::from_secs(5),
+                    );
+
+                    // Start event stream
+                    tokio::spawn(async move {
+                        stream_handler.start_event_stream().await;
+                    });
+
+                    // Forward events to message handler
+                    while let Some(event) = rx.recv().await {
+                        match event {
+                            CoreEvent::ContainerListUpdated | CoreEvent::ContainerRemoved(_) => {
+                                let _ = docker_tx_clone.send(DockerMessage::EventUpdate).await;
+                            }
+                            _ => {}
+                        }
+                    }
+                });
+
+                Some(handler)
+            } else {
+                None
+            };
+
             let mut inner = Self {
                 app_data,
-                config: args,
+                config: args.clone(),
                 binate: Binate::One,
                 docker: Arc::new(docker),
                 event_bus,
                 network_detector: Arc::new(Mutex::new(network::NetworkInterfaceDetector::new())),
                 receiver: docker_rx,
                 spawns: Arc::new(Mutex::new(HashMap::new())),
+                event_handler,
+                last_full_sync: Arc::new(Mutex::new(std::time::Instant::now())),
+                container_tracker: Arc::new(Mutex::new(std::collections::HashSet::new())),
             };
+
             inner.initialise_container_data().await;
-            let heartbeat_handle = Self::heartbeat(&inner.config, docker_tx);
+
+            // Start heartbeat for polling mode or periodic sync for event-driven mode
+            let heartbeat_handle = Self::heartbeat(&inner.config, docker_tx.clone());
+            let sync_handle = inner.start_periodic_sync(docker_tx);
+
             inner.message_handler().await;
 
-            // Cleanup: abort heartbeat when message handler exits
-            heartbeat_handle.abort();
+            // Cleanup: abort handles when message handler exits
+            if let Some(handle) = heartbeat_handle {
+                handle.abort();
+            }
+            if let Some(handle) = sync_handle {
+                handle.abort();
+            }
         }
     }
 }

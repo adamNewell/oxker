@@ -52,6 +52,14 @@ pub struct Args {
     /// Enable debug mode with realtime event display
     #[clap(long = "debug")]
     pub debug: bool,
+
+    /// Enable event-driven mode (experimental) - reduces Docker API calls
+    #[clap(long = "event-driven")]
+    pub event_driven: Option<bool>,
+
+    /// Full sync interval in milliseconds for event-driven mode (min: 30000, max: 300000)
+    #[clap(long = "full-sync-interval", value_name = "ms")]
+    pub full_sync_interval: Option<u32>,
 }
 
 impl Default for Args {
@@ -69,6 +77,8 @@ impl Default for Args {
             save_dir: None,
             config_file: None,
             debug: false,
+            event_driven: None,
+            full_sync_interval: None,
         }
     }
 }

@@ -49,6 +49,8 @@ pub mod test_utils {
                     show_std_err: false,
                     host: None,
                     debug_mode: false,
+                    event_driven_mode: false,
+                    full_sync_interval_ms: 60_000,
                 },
             }
         }
@@ -384,6 +386,8 @@ pub mod test_utils {
             show_logs: false,
             timezone: None,
             debug_mode: false,
+            event_driven_mode: false,
+            full_sync_interval_ms: 60_000,
         }
     }
 

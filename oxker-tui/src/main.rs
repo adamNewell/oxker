@@ -252,6 +252,8 @@ pub mod tests {
             show_std_err: false,
             host: None,
             debug_mode: false,
+            event_driven_mode: false,
+            full_sync_interval_ms: 60_000,
         }
     }
 

@@ -3,6 +3,7 @@
 //! This module provides a real-time event stream listener that monitors Docker container
 //! lifecycle events (create, start, stop, destroy) and publishes them through the EventBus.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
@@ -12,6 +13,7 @@ use bollard::Docker;
 use bollard::models::EventMessage;
 use bollard::query_parameters::EventsOptions;
 use futures_util::StreamExt;
+use parking_lot::Mutex;
 use tokio::time::sleep;
 use tracing::{debug, error, info, warn};
 
@@ -69,6 +71,15 @@ pub struct EventMetricsSnapshot {
     pub reconnect_failures: u64,
 }
 
+/// Tracks recent events for deduplication
+#[derive(Debug, Clone)]
+struct EventRecord {
+    /// Timestamp when event was processed
+    timestamp: Instant,
+    /// Event sequence number from Docker (if available)
+    sequence: Option<u64>,
+}
+
 /// Handles Docker event streaming with automatic reconnection
 pub struct DockerEventHandler {
     /// Docker client for API communication
@@ -79,6 +90,10 @@ pub struct DockerEventHandler {
     reconnect_delay: Duration,
     /// Metrics for tracking event processing
     metrics: Arc<EventMetrics>,
+    /// Event deduplication cache - maps container_id+action to last event record
+    event_cache: Arc<Mutex<HashMap<String, EventRecord>>>,
+    /// Deduplication window duration (default: 5 seconds)
+    dedup_window: Duration,
 }
 
 impl DockerEventHandler {
@@ -95,6 +110,32 @@ impl DockerEventHandler {
             event_bus,
             reconnect_delay,
             metrics: Arc::new(EventMetrics::new()),
+            event_cache: Arc::new(Mutex::new(HashMap::new())),
+            dedup_window: Duration::from_secs(5),
+        }
+    }
+
+    /// Creates a new Docker event handler with custom deduplication window
+    ///
+    /// # Arguments
+    /// * `docker` - Docker client instance
+    /// * `event_bus` - EventBus for publishing events
+    /// * `reconnect_delay` - Initial delay for reconnection attempts
+    /// * `dedup_window` - Duration for event deduplication window
+    #[must_use]
+    pub fn new_with_dedup_window(
+        docker: Docker,
+        event_bus: EventBus,
+        reconnect_delay: Duration,
+        dedup_window: Duration,
+    ) -> Self {
+        Self {
+            docker,
+            event_bus,
+            reconnect_delay,
+            metrics: Arc::new(EventMetrics::new()),
+            event_cache: Arc::new(Mutex::new(HashMap::new())),
+            dedup_window,
         }
     }
 
@@ -102,6 +143,58 @@ impl DockerEventHandler {
     #[must_use]
     pub fn metrics(&self) -> Arc<EventMetrics> {
         Arc::clone(&self.metrics)
+    }
+
+    /// Checks if an event is a duplicate within the deduplication window
+    ///
+    /// # Arguments
+    /// * `container_id` - Container ID
+    /// * `action` - Event action (create, start, stop, destroy)
+    /// * `sequence` - Optional event sequence number
+    ///
+    /// # Returns
+    /// Returns true if this is a duplicate event that should be skipped
+    fn is_duplicate_event(&self, container_id: &str, action: &str, sequence: Option<u64>) -> bool {
+        let cache_key = format!("{container_id}:{action}");
+        let mut cache = self.event_cache.lock();
+        let now = Instant::now();
+
+        // Clean up old entries outside the dedup window
+        cache.retain(|_, record| now.duration_since(record.timestamp) < self.dedup_window);
+
+        // Check if we've seen this event recently
+        if let Some(existing) = cache.get(&cache_key) {
+            // If we have sequence numbers, use them for exact matching
+            if let (Some(existing_seq), Some(new_seq)) = (existing.sequence, sequence) {
+                if existing_seq >= new_seq {
+                    debug!(
+                        "Duplicate event detected (by sequence): container={}, action={}, seq={}",
+                        container_id, action, new_seq
+                    );
+                    return true;
+                }
+            } else {
+                // Without sequence numbers, use time window
+                if now.duration_since(existing.timestamp) < self.dedup_window {
+                    debug!(
+                        "Duplicate event detected (by time): container={}, action={}, window={:?}",
+                        container_id, action, self.dedup_window
+                    );
+                    return true;
+                }
+            }
+        }
+
+        // Record this event
+        cache.insert(
+            cache_key,
+            EventRecord {
+                timestamp: now,
+                sequence,
+            },
+        );
+
+        false
     }
 
     /// Starts the event stream with automatic reconnection on failure
@@ -203,6 +296,12 @@ impl DockerEventHandler {
         if let Some(actor) = &event.actor
             && let Some(id) = &actor.id
         {
+            // Check for duplicate events
+            let sequence = event.time_nano.and_then(|t| u64::try_from(t).ok());
+            if self.is_duplicate_event(id, "create", sequence) {
+                return;
+            }
+
             self.metrics.create_events.fetch_add(1, Ordering::Relaxed);
             info!("Container created: {}", id);
             // Emit event that container list needs updating
@@ -219,6 +318,12 @@ impl DockerEventHandler {
         if let Some(actor) = &event.actor
             && let Some(id) = &actor.id
         {
+            // Check for duplicate events
+            let sequence = event.time_nano.and_then(|t| u64::try_from(t).ok());
+            if self.is_duplicate_event(id, "start", sequence) {
+                return;
+            }
+
             self.metrics.start_events.fetch_add(1, Ordering::Relaxed);
             info!("Container started: {}", id);
             // Emit event that container list needs updating (state changed)
@@ -235,6 +340,12 @@ impl DockerEventHandler {
         if let Some(actor) = &event.actor
             && let Some(id) = &actor.id
         {
+            // Check for duplicate events
+            let sequence = event.time_nano.and_then(|t| u64::try_from(t).ok());
+            if self.is_duplicate_event(id, "stop", sequence) {
+                return;
+            }
+
             self.metrics.stop_events.fetch_add(1, Ordering::Relaxed);
             info!("Container stopped: {}", id);
             // Emit event that container list needs updating (state changed)
@@ -251,6 +362,12 @@ impl DockerEventHandler {
         if let Some(actor) = &event.actor
             && let Some(id) = &actor.id
         {
+            // Check for duplicate events
+            let sequence = event.time_nano.and_then(|t| u64::try_from(t).ok());
+            if self.is_duplicate_event(id, "destroy", sequence) {
+                return;
+            }
+
             self.metrics.destroy_events.fetch_add(1, Ordering::Relaxed);
             info!("Container destroyed: {}", id);
             // Container was removed, emit the appropriate event
@@ -503,5 +620,122 @@ mod tests {
                 panic!("EventBus did not receive expected event");
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_event_deduplication_by_time() {
+        let handler = create_test_handler();
+        let event = create_mock_event("create", "test-container-dedup");
+
+        // Process the same event twice quickly
+        handler.handle_container_create(&event).await;
+        handler.handle_container_create(&event).await;
+
+        // Only one event should be counted
+        let metrics = handler.metrics();
+        assert_eq!(metrics.create_events.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_event_deduplication_with_sequence() {
+        let docker = Docker::connect_with_local_defaults().expect("Docker connection required");
+        let (event_bus, _rx) = EventBus::new(100);
+        let handler = DockerEventHandler::new(docker, event_bus, Duration::from_secs(5));
+
+        // Create events with sequence numbers
+        let mut event1 = create_mock_event("start", "container-seq");
+        event1.time_nano = Some(1000);
+
+        let mut event2 = create_mock_event("start", "container-seq");
+        event2.time_nano = Some(1000); // Same sequence
+
+        let mut event3 = create_mock_event("start", "container-seq");
+        event3.time_nano = Some(2000); // New sequence
+
+        handler.handle_container_start(&event1).await;
+        handler.handle_container_start(&event2).await; // Should be deduplicated
+        handler.handle_container_start(&event3).await; // Should be processed
+
+        let metrics = handler.metrics();
+        assert_eq!(metrics.start_events.load(Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn test_event_deduplication_window_expiry() {
+        let docker = Docker::connect_with_local_defaults().expect("Docker connection required");
+        let (event_bus, _rx) = EventBus::new(100);
+        // Use a very short dedup window for testing
+        let handler = DockerEventHandler::new_with_dedup_window(
+            docker,
+            event_bus,
+            Duration::from_secs(5),
+            Duration::from_millis(100),
+        );
+
+        let event = create_mock_event("stop", "container-expiry");
+
+        // Process first event
+        handler.handle_container_stop(&event).await;
+
+        // Wait for dedup window to expire
+        tokio::time::sleep(Duration::from_millis(150)).await;
+
+        // Process same event again - should not be deduplicated
+        handler.handle_container_stop(&event).await;
+
+        let metrics = handler.metrics();
+        assert_eq!(metrics.stop_events.load(Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn test_event_deduplication_different_actions() {
+        let handler = create_test_handler();
+        let container_id = "multi-action-container";
+
+        // Different actions for the same container should not be deduplicated
+        let create_event = create_mock_event("create", container_id);
+        let start_event = create_mock_event("start", container_id);
+        let stop_event = create_mock_event("stop", container_id);
+
+        handler.handle_container_create(&create_event).await;
+        handler.handle_container_start(&start_event).await;
+        handler.handle_container_stop(&stop_event).await;
+
+        let metrics = handler.metrics();
+        assert_eq!(metrics.create_events.load(Ordering::Relaxed), 1);
+        assert_eq!(metrics.start_events.load(Ordering::Relaxed), 1);
+        assert_eq!(metrics.stop_events.load(Ordering::Relaxed), 1);
+    }
+
+    #[tokio::test]
+    async fn test_event_deduplication_different_containers() {
+        let handler = create_test_handler();
+
+        // Same action for different containers should not be deduplicated
+        let event1 = create_mock_event("create", "container-1");
+        let event2 = create_mock_event("create", "container-2");
+        let event3 = create_mock_event("create", "container-3");
+
+        handler.handle_container_create(&event1).await;
+        handler.handle_container_create(&event2).await;
+        handler.handle_container_create(&event3).await;
+
+        let metrics = handler.metrics();
+        assert_eq!(metrics.create_events.load(Ordering::Relaxed), 3);
+    }
+
+    #[tokio::test]
+    async fn test_rapid_duplicate_events() {
+        let handler = create_test_handler();
+        let event = create_mock_event("start", "rapid-container");
+
+        // Simulate rapid duplicate events
+        for _ in 0..10 {
+            handler.handle_container_start(&event).await;
+        }
+
+        // Only first event should be processed
+        let metrics = handler.metrics();
+        assert_eq!(metrics.start_events.load(Ordering::Relaxed), 1);
     }
 }

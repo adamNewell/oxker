@@ -35,6 +35,8 @@ pub struct Config {
     pub timestamp_format: String,
     pub show_logs: bool,
     pub debug_mode: bool,
+    pub event_driven_mode: bool,
+    pub full_sync_interval_ms: u32,
 }
 
 impl From<&Args> for Config {
@@ -57,6 +59,8 @@ impl From<&Args> for Config {
             timestamp_format: Self::parse_timestamp_format(None),
             show_logs: true,
             debug_mode: args.debug,
+            event_driven_mode: args.event_driven.unwrap_or(false),
+            full_sync_interval_ms: args.full_sync_interval.unwrap_or(60_000),
         }
     }
 }
@@ -81,6 +85,8 @@ impl From<ConfigFile> for Config {
             timestamp_format: Self::parse_timestamp_format(config_file.timestamp_format),
             show_logs: config_file.show_logs.unwrap_or(false),
             debug_mode: false, // Config file doesn't support debug mode
+            event_driven_mode: config_file.event_driven_mode.unwrap_or(false),
+            full_sync_interval_ms: config_file.full_sync_interval_ms.unwrap_or(60_000),
         }
     }
 }

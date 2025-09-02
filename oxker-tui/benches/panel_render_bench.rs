@@ -456,6 +456,8 @@ fn benchmark_full_ui_render(c: &mut Criterion) {
                     timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
                     show_logs: true,
                     debug_mode: false,
+                    event_driven_mode: false,
+                    full_sync_interval_ms: 60_000,
                 };
                 let mut terminal = create_test_terminal();
 

@@ -12,4 +12,6 @@ pub enum DockerMessage {
     Update,
     RefreshLogs(String),
     Shutdown,
+    FullSync,
+    EventUpdate,
 }
