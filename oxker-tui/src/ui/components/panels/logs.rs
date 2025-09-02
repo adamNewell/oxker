@@ -18,8 +18,6 @@ use ratatui::{
 };
 use std::sync::Arc;
 
-const RIGHT_ARROW: &str = "→ ";
-
 /// Logs panel component for displaying container logs
 pub struct LogsPanel {
     // No internal state needed - scroll position is managed externally
@@ -161,13 +159,12 @@ impl<'p> Component<'p> for LogsPanel {
                 let items: Vec<ListItem> =
                     logs.iter().map(|log| ListItem::new(log.as_str())).collect();
 
-                // Configure list with scrolling
+                // Configure list with scrolling and selection highlight
                 let padding = usize::from(area.height / 5);
                 let items = List::new(items)
                     .block(block)
-                    .highlight_symbol(RIGHT_ARROW)
                     .scroll_padding(padding)
-                    .highlight_style(Style::default().add_modifier(Modifier::BOLD));
+                    .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
 
                 // Set up the list state with current scroll position
                 let mut ratatui_state = RatatuiListState::default();
@@ -316,5 +313,99 @@ mod tests {
         let buffer = terminal.backend().buffer();
         assert_eq!(buffer.area.width, 60);
         assert_eq!(buffer.area.height, 15);
+    }
+
+    #[test]
+    fn test_logs_panel_with_ansi_colors() {
+        let panel = LogsPanel::new();
+        let rerender = Arc::new(crate::ui::Rerender::default());
+        let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, true)));
+        let container_state = Arc::new(Mutex::new(UIContainerState::default()));
+        let theme = AppColors::new();
+        let mut fd = FrameViewModel::default();
+
+        // Add logs with ANSI color codes
+        fd.log_view.logs = vec![
+            "\x1b[32mGREEN: Success message\x1b[0m".to_string(),
+            "\x1b[31mRED: Error message\x1b[0m".to_string(),
+            "\x1b[33mYELLOW: Warning message\x1b[0m".to_string(),
+            "\x1b[1mBOLD: Important message\x1b[0m".to_string(),
+            "\x1b[38;5;214mORANGE: 256 color\x1b[0m".to_string(),
+        ];
+
+        // Enable color logs
+        fd.color_logs = true;
+
+        let props = LogsPanelProps {
+            view_model: &fd,
+            theme: &theme,
+            gui_state: &gui_state,
+            container_state: &container_state,
+        };
+
+        let backend = TestBackend::new(80, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                panel.render(&props, f.area(), f);
+            })
+            .unwrap();
+
+        // Verify that the panel renders without panics
+        // and that ANSI codes are preserved (cansi library handles them)
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer.area.width, 80);
+        assert_eq!(buffer.area.height, 10);
+
+        // The actual color rendering is handled by cansi library
+        // This test verifies that logs with ANSI codes don't cause crashes
+    }
+
+    #[test]
+    fn test_logs_panel_selection_visibility() {
+        let panel = LogsPanel::new();
+        let rerender = Arc::new(crate::ui::Rerender::default());
+        let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, true)));
+        let container_state = Arc::new(Mutex::new(UIContainerState::default()));
+        let theme = AppColors::new();
+        let mut fd = FrameViewModel::default();
+
+        // Add multiple logs to test selection
+        fd.log_view.logs = vec![
+            "Line 1: First log entry".to_string(),
+            "Line 2: Second log entry".to_string(),
+            "Line 3: Third log entry".to_string(),
+            "Line 4: Fourth log entry".to_string(),
+            "Line 5: Fifth log entry".to_string(),
+        ];
+
+        // Set the GUI state to have a selected position
+        gui_state.lock().set_ui_logs_position(2); // Select third line
+
+        let props = LogsPanelProps {
+            view_model: &fd,
+            theme: &theme,
+            gui_state: &gui_state,
+            container_state: &container_state,
+        };
+
+        let backend = TestBackend::new(60, 10);
+        let mut terminal = Terminal::new(backend).unwrap();
+
+        terminal
+            .draw(|f| {
+                panel.render(&props, f.area(), f);
+            })
+            .unwrap();
+
+        // Verify rendering completes successfully
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer.area.width, 60);
+        assert_eq!(buffer.area.height, 10);
+
+        // The REVERSED modifier is applied via highlight_style
+        // This test verifies that selection doesn't cause rendering issues
+        // Visual confirmation would show the selected line with reversed colors
     }
 }

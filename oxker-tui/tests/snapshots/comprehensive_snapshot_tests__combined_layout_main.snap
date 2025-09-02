@@ -26,9 +26,9 @@ expression: output
 │      │                                                   ││         │                                                │
 ╰──────────────────────────────────────────────────────────╯╰──────────────────────────────────────────────────────────╯
 ┌ Logs 1/3 - Container Logs ───────────────────────────────────────────────────────────────────────────────────────────┐
-│→ [10:00:00] Starting application...                                                                                  │
-│  [10:00:01] Server listening on port 80                                                                              │
-│  [10:00:02] Ready to accept connections                                                                              │
+│[10:00:00] Starting application...                                                                                    │
+│[10:00:01] Server listening on port 80                                                                                │
+│[10:00:02] Ready to accept connections                                                                                │
 │                                                                                                                      │
 │                                                                                                                      │
 │                                                                                                                      │
