@@ -96,7 +96,6 @@ fn test_filter_panel_regression() {
 }
 
 #[test]
-#[ignore = "Help panel has rendering issues with test buffer sizes"]
 fn test_help_panel_regression() {
     let help_panel = HelpPanel::new();
     let theme = AppColors::new();
@@ -110,7 +109,7 @@ fn test_help_panel_regression() {
         theme,
     };
 
-    let output = capture_component_output(&help_panel, &props, 80, 12);
+    let output = capture_component_output(&help_panel, &props, 100, 50);
     assert_snapshot!("help_panel_default", output);
 
     // Test without timestamp
@@ -121,7 +120,7 @@ fn test_help_panel_regression() {
         theme,
     };
 
-    let output = capture_component_output(&help_panel, &props, 80, 12);
+    let output = capture_component_output(&help_panel, &props, 100, 50);
     assert_snapshot!("help_panel_no_timestamp", output);
 }
 

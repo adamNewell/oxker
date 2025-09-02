@@ -1,0 +1,7 @@
+---
+source: oxker-tui/tests/toast_visual_regression_test.rs
+assertion_line: 46
+expression: output
+---
+                              
+    ✓ mouse capture enabled

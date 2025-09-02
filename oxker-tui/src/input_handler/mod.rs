@@ -58,6 +58,32 @@ impl InputHandler {
         inner.message_handler().await;
     }
 
+    /// Detect if the terminal supports Unicode characters
+    /// Uses environment variables and terminal type to make best guess
+    fn supports_unicode() -> bool {
+        // Check common environment variables that indicate Unicode support
+        if let Ok(lang) = std::env::var("LANG")
+            && (lang.contains("UTF-8") || lang.contains("utf8"))
+        {
+            return true;
+        }
+
+        // Check TERM variable for common Unicode-capable terminals
+        if let Ok(term) = std::env::var("TERM") {
+            // Most modern terminals support Unicode
+            if term.contains("256color")
+                || term.contains("alacritty")
+                || term.contains("kitty")
+                || term.contains("iTerm")
+            {
+                return true;
+            }
+        }
+
+        // Default to ASCII for safety in unknown environments
+        false
+    }
+
     /// check for incoming messages
     async fn message_handler(&mut self) {
         while let Some(message) = self.rx.recv().await {
@@ -216,18 +242,22 @@ impl InputHandler {
             // Mouse capture errors are purely UI concerns
             self.gui_state.lock().status_push(Status::Error);
         };
+
+        // Detect terminal Unicode support and use appropriate symbols
+        let (enabled_symbol, disabled_symbol) = if Self::supports_unicode() {
+            ("✓ mouse capture enabled", "✖ mouse capture disabled")
+        } else {
+            ("[+] mouse capture enabled", "[-] mouse capture disabled")
+        };
+
         if self.mouse_capture {
             if execute!(std::io::stdout(), DisableMouseCapture).is_ok() {
-                self.gui_state
-                    .lock()
-                    .set_info_box("✖ mouse capture disabled");
+                self.gui_state.lock().set_info_box(disabled_symbol);
             } else {
                 err();
             }
         } else if Ui::enable_mouse_capture().is_ok() {
-            self.gui_state
-                .lock()
-                .set_info_box("✓ mouse capture enabled");
+            self.gui_state.lock().set_info_box(enabled_symbol);
         } else {
             err();
         }

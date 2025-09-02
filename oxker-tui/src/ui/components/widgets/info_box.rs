@@ -1,22 +1,17 @@
 //! Info box widget for displaying temporary status messages
 
-use crate::ui::{
-    color_conversion::IntoRatatuiColor,
-    components::{Component, layout::ModalOverlay},
-};
+use crate::ui::{color_conversion::IntoRatatuiColor, components::Component};
 use oxker_core::AppColors;
 use ratatui::{
     Frame,
     layout::{Alignment, Rect},
     style::Style,
-    text::Line,
-    widgets::{Block, Borders, Paragraph, Wrap},
+    widgets::{Block, Clear, Paragraph},
 };
 use std::time::{Duration, Instant};
 
-/// An info box widget that displays temporary messages
+/// A toast notification widget that displays temporary messages
 pub struct InfoBox {
-    overlay: ModalOverlay,
     show_duration: Duration,
 }
 
@@ -28,12 +23,8 @@ pub struct InfoBoxProps<'a> {
 
 impl InfoBox {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
-            overlay: ModalOverlay::new()
-                .width_percent(40)
-                .height_percent(20)
-                .position(crate::ui::components::layout::Position::Top),
             show_duration: Duration::from_secs(2),
         }
     }
@@ -50,10 +41,21 @@ impl InfoBox {
         start_time.elapsed() < self.show_duration
     }
 
-    /// Calculate the area for the info box
+    /// Calculate the area for the toast notification (bottom-right corner)
     #[must_use]
-    pub fn area(&self, parent: Rect) -> Rect {
-        self.overlay.area(parent)
+    pub const fn area(&self, parent: Rect, _message_len: usize) -> Rect {
+        // Use static size for consistent appearance when toggling
+        // Fixed width with comfortable padding
+        let width = 30;
+        // Fixed height for consistent positioning
+        let height = 3;
+
+        // Position in bottom-right corner with comfortable padding
+        // Additional padding for better visual separation
+        let x = parent.x + parent.width.saturating_sub(width + 2);
+        let y = parent.y + parent.height.saturating_sub(height + 1);
+
+        Rect::new(x, y, width, height)
     }
 }
 
@@ -67,41 +69,35 @@ impl<'p> Component<'p> for InfoBox {
             return;
         }
 
-        // Calculate remaining time
-        let elapsed = props.start_time.elapsed();
-        let remaining = self.show_duration.saturating_sub(elapsed);
-        let remaining_secs = remaining.as_secs_f32();
+        // Calculate the toast area
+        let toast_area = self.area(area, props.message.len());
 
-        // Create the info box block
-        let block = Block::default()
-            .borders(Borders::ALL)
-            .border_style(Style::default().fg(props.theme.borders.unselected.into_ratatui_color()))
-            .title(Line::from(vec![
-                ratatui::text::Span::raw(" "),
-                ratatui::text::Span::styled(
-                    "Info",
-                    Style::default().fg(props.theme.popup_info.text.into_ratatui_color()),
-                ),
-                ratatui::text::Span::raw(" "),
-            ]));
+        // Clear the area first to ensure clean rendering
+        frame.render_widget(Clear, toast_area);
 
-        // Create the content paragraph
-        let content = Paragraph::new(props.message)
-            .style(Style::default().fg(props.theme.popup_info.text.into_ratatui_color()))
-            .alignment(Alignment::Center)
-            .wrap(Wrap { trim: true })
-            .block(block);
+        // Create a simple block for the toast background
+        let block = Block::default().style(
+            Style::default()
+                .bg(props.theme.popup_info.background.into_ratatui_color())
+                .fg(props.theme.popup_info.text.into_ratatui_color()),
+        );
 
-        // Calculate the info box area
-        let info_area = self.area(area);
+        // Render the background
+        frame.render_widget(block, toast_area);
 
-        // Render the info box
-        frame.render_widget(content, info_area);
+        // Create the content with vertical centering
+        // Add empty line before and after for vertical padding in 3-line area
+        let padded_text = format!("\n{}\n", props.message);
+        let content = Paragraph::new(padded_text)
+            .style(
+                Style::default()
+                    .fg(props.theme.popup_info.text.into_ratatui_color())
+                    .bg(props.theme.popup_info.background.into_ratatui_color()),
+            )
+            .alignment(Alignment::Center);
 
-        // Optionally show a progress indicator for remaining time
-        if remaining_secs < 1.0 {
-            // Fade out effect could be added here
-        }
+        // Render the toast content
+        frame.render_widget(content, toast_area);
     }
 }
 
@@ -118,7 +114,7 @@ mod tests {
     use ratatui::backend::TestBackend;
 
     #[test]
-    fn test_info_box_visibility() {
+    fn test_toast_visibility() {
         let info_box = InfoBox::new().duration(Duration::from_secs(1));
         let start = Instant::now();
 
@@ -129,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn test_info_box_render() {
+    fn test_toast_render() {
         let info_box = InfoBox::new();
         let theme = AppColors::new();
         let props = InfoBoxProps {
@@ -151,5 +147,36 @@ mod tests {
         let buffer = terminal.backend().buffer();
         assert_eq!(buffer.area.width, 80);
         assert_eq!(buffer.area.height, 24);
+    }
+
+    #[test]
+    fn test_toast_area_calculation() {
+        let info_box = InfoBox::new();
+        let parent = Rect::new(0, 0, 80, 24);
+
+        // Test that toast has consistent static size regardless of message length
+        let area_short = info_box.area(parent, 10);
+        assert_eq!(area_short.width, 30); // static width
+        assert_eq!(area_short.height, 3); // static height
+        assert_eq!(area_short.x, 48); // 80 - 30 - 2
+        assert_eq!(area_short.y, 20); // 24 - 3 - 1
+
+        // Test with medium message - same size
+        let area_medium = info_box.area(parent, 25);
+        assert_eq!(area_medium.width, 30); // same width
+        assert_eq!(area_medium.height, 3); // same height
+        assert_eq!(area_medium.x, 48); // same position
+        assert_eq!(area_medium.y, 20); // same position
+
+        // Test with longer message - still same size
+        let area_long = info_box.area(parent, 50);
+        assert_eq!(area_long.width, 30); // same width
+        assert_eq!(area_long.height, 3); // same height
+        assert_eq!(area_long.x, 48); // same position
+        assert_eq!(area_long.y, 20); // same position
+
+        // Verify all areas are identical (important for consistent UX)
+        assert_eq!(area_short, area_medium);
+        assert_eq!(area_medium, area_long);
     }
 }
