@@ -11,4 +11,5 @@ pub enum DockerMessage {
     Exec(Sender<Arc<Docker>>),
     Update,
     RefreshLogs(String),
+    Shutdown,
 }

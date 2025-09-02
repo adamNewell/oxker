@@ -18,6 +18,7 @@ use tracing::error;
 // draw_blocks module removed - functionality migrated to components
 pub mod color_conversion;
 mod gui_state;
+pub mod loading_state;
 mod redraw;
 mod view_models;
 

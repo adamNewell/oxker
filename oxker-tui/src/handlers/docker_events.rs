@@ -123,6 +123,16 @@ impl UIEventHandler {
                     );
                     self.rerender.update_draw();
                 }
+                CoreEvent::DockerConnectionLost => {
+                    error!("Docker connection lost");
+                    self.gui_state.lock().status_push(Status::DockerConnect);
+                    self.rerender.update_draw();
+                }
+                CoreEvent::DockerConnectionRestored => {
+                    info!("Docker connection restored");
+                    self.gui_state.lock().status_del(Status::DockerConnect);
+                    self.rerender.update_draw();
+                }
             }
         }
 

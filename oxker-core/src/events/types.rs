@@ -52,6 +52,9 @@ pub enum CoreEvent {
     LoadingStarted(String),           // UUID as string
     LoadingFinished(String),          // UUID as string
     ContainerDeletionStarted(String), // Container ID
+    // Connection events
+    DockerConnectionLost,
+    DockerConnectionRestored,
     // Debug events for performance monitoring
     DebugLatency {
         operation: String,

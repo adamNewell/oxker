@@ -11,6 +11,7 @@
 pub mod app_data;
 pub mod app_error;
 pub mod config;
+pub mod connection_monitor;
 pub mod docker_cli;
 pub mod docker_data;
 pub mod events;
@@ -18,6 +19,7 @@ pub mod exec;
 pub mod exec_interface;
 pub mod handle;
 pub mod keys;
+pub mod task_registry;
 
 // Re-exports for public API
 pub use app_data::{
@@ -27,6 +29,7 @@ pub use app_data::{
 };
 pub use app_error::AppError;
 pub use config::{AppColors, Config, Keymap};
+pub use connection_monitor::{ConnectionMonitor, ConnectionMonitorConfig, ConnectionState};
 pub use docker_cli::{DockerCliDetector, DockerCliStatus};
 pub use docker_data::{DockerData, DockerMessage};
 pub use events::{CoreCommand, CoreEvent, EventBus};
@@ -34,6 +37,7 @@ pub use exec::{exec_docker_cli, tty_readable};
 pub use exec_interface::{ExecInterface, TerminalDimensions, TerminalHandler};
 pub use handle::{CoreHandle, CoreStateView};
 pub use keys::{KeyCode, KeyModifiers};
+pub use task_registry::{TaskMetadata, TaskRegistry};
 
 pub const ENV_KEY: &str = "OXKER_RUNTIME";
 pub const ENV_VALUE: &str = "container";

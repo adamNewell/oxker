@@ -20,10 +20,16 @@ pub struct MockCoreHandle {
 }
 
 impl MockCoreHandle {
-    #[must_use]
-    pub fn new(event_bus: EventBus) -> Self {
+    /// Creates a new mock core handle for testing.
+    ///
+    /// # Panics
+    ///
+    /// Panics if Docker connection cannot be established for the mock.
+    pub async fn new(event_bus: EventBus) -> Self {
         let config = Self::gen_config();
-        let handle = CoreHandle::new(event_bus.clone(), &config);
+        let handle = CoreHandle::try_new(event_bus.clone(), &config)
+            .await
+            .unwrap_or_else(|e| panic!("Failed to create CoreHandle in mock: {e}"));
 
         Self {
             commands: Arc::new(Mutex::new(Vec::new())),

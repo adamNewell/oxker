@@ -44,8 +44,11 @@ fn cleanup_terminal() {
 }
 
 /// Initialize CoreHandle which manages Docker connection internally
-fn core_init(event_bus: EventBus, config: &Config) -> CoreHandle {
-    CoreHandle::new(event_bus, config)
+async fn core_init(
+    event_bus: EventBus,
+    config: &Config,
+) -> Result<CoreHandle, oxker_core::AppError> {
+    CoreHandle::try_new(event_bus, config).await
 }
 
 /// Create data for, and then spawn a tokio thread, for the input handler
@@ -80,7 +83,14 @@ async fn main() {
     let (event_bus, receiver) = EventBus::new(100);
 
     // Initialize CoreHandle with Docker connection
-    let core_handle = core_init(event_bus, &config);
+    let core_handle = match core_init(event_bus, &config).await {
+        Ok(handle) => handle,
+        Err(e) => {
+            eprintln!("Failed to initialize Docker connection: {e}");
+            eprintln!("\nPlease ensure Docker is installed and running.");
+            std::process::exit(1);
+        }
+    };
 
     writer::write_debug(
         EventCategory::System,

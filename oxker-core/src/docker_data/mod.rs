@@ -17,6 +17,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
 };
+use tracing::info;
 use uuid::Uuid;
 
 use crate::{
@@ -519,24 +520,36 @@ impl DockerData {
                         }
                     }
                 }
+                DockerMessage::Shutdown => {
+                    info!("DockerData received shutdown signal");
+                    // Abort all spawned tasks
+                    for (_id, handle) in self.spawns.lock().drain() {
+                        handle.abort();
+                    }
+                    break; // Exit the loop to shutdown
+                }
             }
         }
+        info!("DockerData shutting down");
     }
 
     /// Send an update message every x ms, where x is the args.docker_interval
-    fn heartbeat(config: &Config, docker_tx: Sender<DockerMessage>) {
+    fn heartbeat(config: &Config, docker_tx: Sender<DockerMessage>) -> JoinHandle<()> {
         let update_duration =
             std::time::Duration::from_millis(u64::from(config.docker_interval_ms));
         let mut now = std::time::Instant::now();
         tokio::spawn(async move {
             loop {
-                docker_tx.send(DockerMessage::Update).await.ok();
+                if docker_tx.send(DockerMessage::Update).await.is_err() {
+                    // Channel closed, exit heartbeat
+                    break;
+                }
                 if let Some(to_sleep) = update_duration.checked_sub(now.elapsed()) {
                     tokio::time::sleep(to_sleep).await;
                 }
                 now = std::time::Instant::now();
             }
-        });
+        })
     }
 
     /// Initialise self, and start the message receiving loop
@@ -560,8 +573,11 @@ impl DockerData {
                 spawns: Arc::new(Mutex::new(HashMap::new())),
             };
             inner.initialise_container_data().await;
-            Self::heartbeat(&inner.config, docker_tx);
+            let heartbeat_handle = Self::heartbeat(&inner.config, docker_tx);
             inner.message_handler().await;
+
+            // Cleanup: abort heartbeat when message handler exits
+            heartbeat_handle.abort();
         }
     }
 }

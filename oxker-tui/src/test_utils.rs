@@ -177,12 +177,18 @@ pub mod test_utils {
     }
 
     impl TestSetup {
-        #[must_use]
-        pub fn new(width: u16, height: u16, show_logs: bool) -> Self {
+        /// Creates a new test setup.
+        ///
+        /// # Panics
+        ///
+        /// Panics if Docker connection cannot be established for testing.
+        pub async fn new(width: u16, height: u16, show_logs: bool) -> Self {
             let config = TestConfigBuilder::new().with_show_logs(show_logs).build();
 
             let (event_bus, _receiver) = EventBus::new(10);
-            let core_handle = CoreHandle::new(event_bus, &config);
+            let core_handle = CoreHandle::try_new(event_bus, &config)
+                .await
+                .unwrap_or_else(|e| panic!("Failed to create CoreHandle in test: {e}"));
 
             let rerender = Arc::new(Rerender::new());
             let gui_state = Arc::new(Mutex::new(GuiState::new(&rerender, show_logs)));

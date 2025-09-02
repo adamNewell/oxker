@@ -6,7 +6,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock_core_handle_basic() {
         let (event_bus, mut receiver) = EventBus::new(100);
-        let mock = MockCoreHandle::new(event_bus);
+        let mock = MockCoreHandle::new(event_bus).await;
 
         // Test command recording
         mock.execute_command(CoreCommand::RefreshContainers)
@@ -26,7 +26,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock_core_handle_container_lifecycle() {
         let (event_bus, _receiver) = EventBus::new(100);
-        let mock = MockCoreHandle::new(event_bus);
+        let mock = MockCoreHandle::new(event_bus).await;
 
         // Get initial containers
         let initial_containers = mock.containers.lock().clone();
@@ -57,7 +57,7 @@ mod tests {
     #[tokio::test]
     async fn test_mock_core_handle_logs() {
         let (event_bus, mut receiver) = EventBus::new(100);
-        let mock = MockCoreHandle::new(event_bus);
+        let mock = MockCoreHandle::new(event_bus).await;
 
         // Add test logs
         mock.add_logs(

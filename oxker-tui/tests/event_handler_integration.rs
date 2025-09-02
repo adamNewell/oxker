@@ -12,7 +12,7 @@ async fn test_mock_core_handle_basic_operations() {
     let (event_bus, _receiver) = EventBus::new(100);
 
     // Create mock handle with event bus
-    let mock_handle = MockCoreHandle::new(event_bus);
+    let mock_handle = MockCoreHandle::new(event_bus).await;
 
     // Test that commands are recorded
     assert_eq!(mock_handle.get_commands().len(), 0);
@@ -32,7 +32,7 @@ async fn test_gui_state_creation() {
 async fn test_mock_handle_command_recording() {
     // Setup
     let (event_bus, _receiver) = EventBus::new(100);
-    let mock_handle = MockCoreHandle::new(event_bus);
+    let mock_handle = MockCoreHandle::new(event_bus).await;
 
     // Execute some commands
     mock_handle
