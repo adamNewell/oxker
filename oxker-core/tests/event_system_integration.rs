@@ -21,6 +21,7 @@ const fn gen_config() -> Config {
         debug_mode: false,
         event_driven_mode: false,
         full_sync_interval_ms: 60_000,
+        stats_optimization_enabled: true,
     }
 }
 

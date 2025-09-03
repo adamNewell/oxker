@@ -78,6 +78,7 @@ pub struct ConfigFile {
     pub show_logs: Option<bool>,
     pub event_driven_mode: Option<bool>,
     pub full_sync_interval_ms: Option<u32>,
+    pub stats_optimization_enabled: Option<bool>,
 }
 
 impl ConfigFile {

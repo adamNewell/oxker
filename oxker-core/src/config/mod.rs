@@ -37,6 +37,7 @@ pub struct Config {
     pub debug_mode: bool,
     pub event_driven_mode: bool,
     pub full_sync_interval_ms: u32,
+    pub stats_optimization_enabled: bool,
 }
 
 impl From<&Args> for Config {
@@ -61,6 +62,7 @@ impl From<&Args> for Config {
             debug_mode: args.debug,
             event_driven_mode: args.event_driven.unwrap_or(false),
             full_sync_interval_ms: args.full_sync_interval.unwrap_or(60_000),
+            stats_optimization_enabled: true,
         }
     }
 }
@@ -87,6 +89,7 @@ impl From<ConfigFile> for Config {
             debug_mode: false, // Config file doesn't support debug mode
             event_driven_mode: config_file.event_driven_mode.unwrap_or(false),
             full_sync_interval_ms: config_file.full_sync_interval_ms.unwrap_or(60_000),
+            stats_optimization_enabled: config_file.stats_optimization_enabled.unwrap_or(true),
         }
     }
 }

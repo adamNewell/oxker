@@ -17,7 +17,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
     task::JoinHandle,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, info, trace, warn};
 use uuid::Uuid;
 
 use crate::{
@@ -33,8 +33,12 @@ use crate::{
 mod event_stream;
 mod message;
 mod network;
+mod stats_metrics;
+#[cfg(test)]
+mod stats_optimization_tests;
 pub use event_stream::{DockerEventHandler, EventMetrics, EventMetricsSnapshot};
 pub use message::DockerMessage;
+pub use stats_metrics::{StatsMetrics, StatsMetricsSnapshot};
 
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 enum SpawnId {
@@ -83,6 +87,7 @@ pub struct DockerData {
     event_handler: Option<Arc<DockerEventHandler>>,
     last_full_sync: Arc<Mutex<std::time::Instant>>,
     container_tracker: Arc<Mutex<std::collections::HashSet<String>>>,
+    stats_metrics: Arc<StatsMetrics>,
 }
 
 impl DockerData {
@@ -146,8 +151,14 @@ impl DockerData {
         event_bus: Arc<EventBus>,
         network_detector: Arc<Mutex<network::NetworkInterfaceDetector>>,
         network_interface_config: Option<String>,
+        stats_metrics: Arc<StatsMetrics>,
     ) {
+        let start_time = std::time::Instant::now();
         let id = spawn_id.get_id();
+
+        // Track task started
+        stats_metrics.task_started();
+
         let mut stream = docker
             .stats(
                 id.get(),
@@ -157,6 +168,9 @@ impl DockerData {
                 }),
             )
             .take(1);
+
+        // Track API call
+        stats_metrics.api_call_made();
 
         while let Some(Ok(stats)) = stream.next().await {
             // Memory stats are only collected if the container is alive - is this the behaviour we want?
@@ -226,13 +240,60 @@ impl DockerData {
                     .await;
             }
         }
+
+        // Track latency and task completion
+        let latency_ms = u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
+        stats_metrics.update_latency(latency_ms);
+        stats_metrics.task_finished();
+
         spawns.lock().remove(&spawn_id);
     }
 
     /// Update all stats, spawn each container into own tokio::spawn thread
     fn update_all_container_stats(&mut self) {
         let all_ids = self.app_data.lock().get_all_id_state();
+
+        // Log the optimization mode
+        if self.config.stats_optimization_enabled {
+            trace!("Stats optimization enabled - polling only running containers");
+        }
+
         for (state, id) in all_ids {
+            // Skip non-running containers if optimization is enabled
+            if self.config.stats_optimization_enabled && !state.is_alive() {
+                // Track skipped container
+                self.stats_metrics.container_skipped();
+
+                // Clear stats data for stopped containers
+                self.app_data.lock().update_stats_by_id(
+                    &id, None, // Clear CPU stats
+                    None, // Clear memory stats
+                    0,    // Clear memory limit
+                    0,    // Clear RX
+                    0,    // Clear TX
+                );
+
+                // Remove any existing stats task for non-running containers
+                let spawn_id = SpawnId::Stats((id.clone(), self.binate));
+                let handle = self.spawns.lock().remove(&spawn_id);
+                if let Some(handle) = handle {
+                    handle.abort();
+                    trace!(
+                        "Cancelled stats task for non-running container: {}",
+                        id.get()
+                    );
+                }
+
+                // Also remove the opposite binate task
+                let opposite_spawn_id = SpawnId::Stats((id, self.binate.toggle()));
+                let handle = self.spawns.lock().remove(&opposite_spawn_id);
+                if let Some(handle) = handle {
+                    handle.abort();
+                    trace!("Cancelled opposite binate stats task for non-running container");
+                }
+                continue;
+            }
+
             let spawn_id = SpawnId::Stats((id, self.binate));
 
             if let std::collections::hash_map::Entry::Vacant(spawns) =
@@ -247,6 +308,7 @@ impl DockerData {
                     Arc::clone(&self.event_bus),
                     Arc::clone(&self.network_detector),
                     self.config.network_interface.clone(),
+                    Arc::clone(&self.stats_metrics),
                 )));
             }
         }
@@ -790,6 +852,15 @@ impl DockerData {
                 None
             };
 
+            let stats_metrics = Arc::new(StatsMetrics::new(args.stats_optimization_enabled));
+
+            // Log the optimization mode at startup
+            if args.stats_optimization_enabled {
+                info!("Stats optimization enabled - will poll only running containers");
+            } else {
+                info!("Stats optimization disabled - using legacy polling mode");
+            }
+
             let mut inner = Self {
                 app_data,
                 config: args.clone(),
@@ -802,6 +873,7 @@ impl DockerData {
                 event_handler,
                 last_full_sync: Arc::new(Mutex::new(std::time::Instant::now())),
                 container_tracker: Arc::new(Mutex::new(std::collections::HashSet::new())),
+                stats_metrics,
             };
 
             inner.initialise_container_data().await;
